@@ -20,15 +20,15 @@ import { getPerson, isPlatformAdmin } from "~/lib/people.server";
 type Db = BetterSQLite3Database<typeof schema>;
 type Comment = typeof comments.$inferSelect;
 
-/** Trims a comment body and enforces the length limits. Throws if invalid. */
+/** Trims a Question or Reply body and enforces the length limits. Throws if invalid. */
 export function assertValidCommentBody(body: string) {
   const trimmed = body.trim();
   if (trimmed.length < MIN_COMMENT_LENGTH) {
-    throw new Error("Comment cannot be empty");
+    throw new Error("A Question or Reply cannot be empty");
   }
   if (trimmed.length > MAX_COMMENT_LENGTH) {
     throw new Error(
-      `Comment must be ${MAX_COMMENT_LENGTH} characters or fewer`
+      `A Question or Reply must be ${MAX_COMMENT_LENGTH} characters or fewer`
     );
   }
   return trimmed;
@@ -139,13 +139,13 @@ export function createComment(
   if (parentId !== null) {
     parent = getCommentById(db, parentId);
     if (!parent) {
-      throw new Error("Parent comment not found");
+      throw new Error("Question not found");
     }
     if (parent.lessonId !== lessonId) {
-      throw new Error("Parent comment belongs to a different lesson");
+      throw new Error("That Question is on a different lesson");
     }
     if (parent.parentId !== null) {
-      throw new Error("Replies can only be one level deep");
+      throw new Error("Nobody can reply to a Reply");
     }
   }
 

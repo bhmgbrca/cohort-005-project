@@ -89,7 +89,7 @@ describe("createComment", () => {
 
     expect(() =>
       createComment(db, base.user.id, lessonId, reply.id, "Thanks!")
-    ).toThrow("Replies can only be one level deep");
+    ).toThrow("Nobody can reply to a Reply");
   });
 
   it("refuses a Reply to a Question on a different lesson", () => {
@@ -108,19 +108,25 @@ describe("createComment", () => {
 
     expect(() =>
       createComment(db, base.instructor.id, otherLessonId, question.id, "Hi")
-    ).toThrow("Parent comment belongs to a different lesson");
+    ).toThrow("That Question is on a different lesson");
+  });
+
+  it("refuses a Reply to a Question that doesn't exist", () => {
+    expect(() =>
+      createComment(db, base.user.id, lessonId, 999_999, "Thanks!")
+    ).toThrow("Question not found");
   });
 
   it("refuses an empty body", () => {
     expect(() =>
       createComment(db, base.user.id, lessonId, null, "   ")
-    ).toThrow("Comment cannot be empty");
+    ).toThrow("A Question or Reply cannot be empty");
   });
 
   it("refuses a body over 5000 characters", () => {
     expect(() =>
       createComment(db, base.user.id, lessonId, null, "a".repeat(5001))
-    ).toThrow("Comment must be 5000 characters or fewer");
+    ).toThrow("A Question or Reply must be 5000 characters or fewer");
   });
 
   it("accepts a body of exactly 5000 characters", () => {
