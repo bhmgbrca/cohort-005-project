@@ -218,10 +218,14 @@ function describeError(error: unknown): string {
 }
 
 /**
- * Sends a Notification. Never throws: one attempt, at most 3 seconds, and on failure or timeout it logs
- * the kind, recipient ids, triggering record and error, then returns, so the
- * person acting never notices. Does nothing for `null`, so a route can pass a
- * domain function's result straight in.
+ * Sends a Notification. Never throws: one attempt, at most 3 seconds, and on
+ * failure or timeout it logs the kind, recipient ids, triggering record and
+ * error, then returns, so the person acting never notices. Does nothing for
+ * `null`, so a route can pass a domain function's result straight in.
+ *
+ * Call it before sending any email from the same action, so an email failure
+ * can't stop the Notification; since `notify` never throws, it can't stop the
+ * email either.
  */
 export async function notify(
   notification: Notification | null,
