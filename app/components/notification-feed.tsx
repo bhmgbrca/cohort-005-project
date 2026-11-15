@@ -70,11 +70,12 @@ function KnockFeed({
     const response = await fetch(TOKEN_REFRESH_URL, {
       headers: { Accept: "application/json" },
     });
-    if (response.status === 401) {
+    if (!response.ok) {
+      // Signed out, Knock unconfigured or a server error: reload rather than
+      // let the feed die silently once the old token expires.
       window.location.reload();
       return;
     }
-    if (!response.ok) return;
 
     const refreshed: { userId: string; token: string } = await response.json();
     if (refreshed.userId !== userId) {

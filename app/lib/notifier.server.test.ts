@@ -5,9 +5,10 @@ import {
   getFeedConfig,
   notificationText,
   notify,
-  recordingTransport,
   type Notification,
 } from "./notifier.server";
+import type { PurchaseKind } from "./refunds.server";
+import { recordingTransport } from "~/test/recording-transport";
 
 function replyToQuestion(answered: boolean): Notification {
   return {
@@ -36,9 +37,7 @@ describe("notificationText", () => {
   });
 });
 
-function newRefundRequest(
-  purchaseKind: "individual_purchase" | "team_licence"
-): Notification {
+function newRefundRequest(purchaseKind: PurchaseKind): Notification {
   return {
     kind: "new-refund-request",
     recipients: [{ id: 3, name: "Pat Admin" }],
@@ -46,7 +45,7 @@ function newRefundRequest(
     url: "/admin/refunds",
     refundRequestId: 21,
     courseTitle: "Intro to TypeScript",
-    amount: 7900,
+    amountPaid: 7900,
     purchaseKind,
   };
 }
@@ -66,7 +65,7 @@ describe("notificationText for New Refund Request", () => {
 });
 
 function refundApproved(
-  overrides: Partial<{ teamLicence: boolean; note: string | null }> = {}
+  overrides: Partial<{ purchaseKind: PurchaseKind; note: string | null }> = {}
 ): Notification {
   return {
     kind: "refund-approved",
@@ -76,14 +75,14 @@ function refundApproved(
     refundRequestId: 21,
     courseTitle: "Intro to Testing",
     amountPaid: 7900,
-    teamLicence: false,
+    purchaseKind: "individual_purchase",
     note: null,
     ...overrides,
   };
 }
 
 function refundDeclined(
-  overrides: Partial<{ teamLicence: boolean; note: string }> = {}
+  overrides: Partial<{ purchaseKind: PurchaseKind; note: string }> = {}
 ): Notification {
   return {
     kind: "refund-declined",
@@ -92,7 +91,8 @@ function refundDeclined(
     url: "/settings",
     refundRequestId: 21,
     courseTitle: "Intro to Testing",
-    teamLicence: false,
+    amountPaid: 7900,
+    purchaseKind: "individual_purchase",
     note: "You finished the course.",
     ...overrides,
   };
@@ -106,7 +106,7 @@ describe("notificationText for Refund Request approved", () => {
   });
 
   it("tells a Team Admin their Unclaimed Seats can no longer be claimed", () => {
-    expect(notificationText(refundApproved({ teamLicence: true }))).toBe(
+    expect(notificationText(refundApproved({ purchaseKind: "team_licence" }))).toBe(
       "**Refund approved** for *Intro to Testing*. $79.00 is on its way back to you. Your Unclaimed Seats can no longer be claimed."
     );
   });
@@ -138,7 +138,7 @@ describe("notificationText for Refund Request declined", () => {
   });
 
   it("uses the same wording for a Team Licence", () => {
-    expect(notificationText(refundDeclined({ teamLicence: true }))).toBe(
+    expect(notificationText(refundDeclined({ purchaseKind: "team_licence" }))).toBe(
       '**Refund declined** for *Intro to Testing*: "You finished the course." You still have everything you bought.'
     );
   });
@@ -201,6 +201,14 @@ describe("notify", () => {
     await notify(notification, transport);
 
     expect(transport.sent).toEqual([notification]);
+  });
+
+  it("does nothing when there is no Notification", async () => {
+    const transport = recordingTransport();
+
+    await notify(null, transport);
+
+    expect(transport.sent).toEqual([]);
   });
 
   it("logs a failed send with its kind, recipients, triggering record and error, without throwing", async () => {
@@ -321,12 +329,13 @@ describe("getFeedConfig", () => {
       feedChannelId: "feed-channel-id",
       userId: "42",
     });
-    const [header, payload] = config!.userToken.split(".");
+    if (!config) throw new Error("expected a feed config");
+    const [header, payload] = config.userToken.split(".");
     expect(decodeSegment(header).alg).toBe("RS256");
     const claims = decodeSegment(payload);
     expect(claims.sub).toBe("42");
     expect(claims.exp).toBe(Date.parse("2026-11-14T13:00:00Z") / 1000);
-    expect(verifiesWith(config!.userToken, publicKey)).toBe(true);
+    expect(verifiesWith(config.userToken, publicKey)).toBe(true);
   });
 
   it("accepts the signing key as a raw PEM too", async () => {
@@ -335,7 +344,8 @@ describe("getFeedConfig", () => {
 
     const config = await getFeedConfig(7);
 
-    expect(config?.userId).toBe("7");
-    expect(verifiesWith(config!.userToken, publicKey)).toBe(true);
+    if (!config) throw new Error("expected a feed config");
+    expect(config.userId).toBe("7");
+    expect(verifiesWith(config.userToken, publicKey)).toBe(true);
   });
 });

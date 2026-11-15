@@ -19,6 +19,7 @@ import {
 } from "~/db/schema";
 import { formatPrice } from "~/lib/utils";
 import type { Notification, Person } from "~/lib/notifier.server";
+import { getPerson } from "~/lib/people.server";
 import {
   REFUND_COMPLETION_LIMIT,
   REFUND_WATCH_LIMIT_SECONDS,
@@ -422,7 +423,7 @@ export function raiseRefundRequest(
             url: "/admin/refunds",
             refundRequestId: refundRequest.id,
             courseTitle: course.title,
-            amount: purchase.amountPaid,
+            amountPaid: purchase.amountPaid,
             purchaseKind: kind,
           },
     email: {
@@ -784,7 +785,8 @@ export function declineRefundRequest(
 
 /**
  * Refund Request approved (A) or declined (B), to the buyer from the deciding
- * Platform Admin. `null` when the admin decided their own Refund Request.
+ * Platform Admin. `null` when the admin decided their own Refund Request, or
+ * when the buyer, admin or course can't be found.
  */
 function buildDecisionNotification(
   db: Queryable,
@@ -797,35 +799,31 @@ function buildDecisionNotification(
 ): Notification | null {
   if (purchase.userId === platformAdminId) return null;
 
-  const person = (id: number) => {
-    const user = db
-      .select({ id: users.id, name: users.name })
-      .from(users)
-      .where(eq(users.id, id))
-      .get();
-    return user ?? { id, name: "Someone" };
-  };
+  const buyer = getPerson(db, purchase.userId);
+  const platformAdmin = getPerson(db, platformAdminId);
   const course = db
     .select({ title: courses.title })
     .from(courses)
     .where(eq(courses.id, purchase.courseId))
     .get();
-  const teamLicence = kindOf(getSeats(db, purchase.id)) === "team_licence";
+  if (!buyer || !platformAdmin || !course) return null;
+
+  const purchaseKind = kindOf(getSeats(db, purchase.id));
 
   const common = {
-    recipients: [person(purchase.userId)],
-    actor: person(platformAdminId),
-    url: teamLicence ? "/team" : "/settings",
+    recipients: [buyer],
+    actor: platformAdmin,
+    url: purchaseKind === "team_licence" ? "/team" : "/settings",
     refundRequestId,
-    courseTitle: course?.title ?? "your course",
-    teamLicence,
+    courseTitle: course.title,
+    amountPaid: purchase.amountPaid,
+    purchaseKind,
   };
 
   return decision.decision === RefundStatus.Approved
     ? {
         ...common,
         kind: "refund-approved",
-        amountPaid: purchase.amountPaid,
         note: decision.note,
       }
     : { ...common, kind: "refund-declined", note: decision.note };

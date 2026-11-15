@@ -267,7 +267,7 @@ describe("the New Refund Request Notification", () => {
       url: "/admin/refunds",
       refundRequestId: result.refundRequestId,
       courseTitle: base.course.title,
-      amount: 4900,
+      amountPaid: 4900,
       purchaseKind: "individual_purchase",
     });
   });
@@ -281,7 +281,7 @@ describe("the New Refund Request Notification", () => {
     if (!result.ok) throw new Error(result.error);
     expect(result.notification).toMatchObject({
       purchaseKind: "team_licence",
-      amount: 15800,
+      amountPaid: 15800,
     });
   });
 
@@ -470,7 +470,7 @@ describe("notifying the buyer of an approval", () => {
       refundRequestId: id,
       courseTitle: "Test Course",
       amountPaid: 7900,
-      teamLicence: false,
+      purchaseKind: "individual_purchase",
       note: null,
     });
   });
@@ -494,7 +494,7 @@ describe("notifying the buyer of an approval", () => {
       recipients: [{ id: priya.id, name: "Priya" }],
       url: "/team",
       amountPaid: 15800,
-      teamLicence: true,
+      purchaseKind: "team_licence",
       note: "Refunded in full.",
     });
   });
@@ -531,7 +531,8 @@ describe("notifying the buyer of a decline", () => {
       url: "/settings",
       refundRequestId: id,
       courseTitle: "Test Course",
-      teamLicence: false,
+      amountPaid: 7900,
+      purchaseKind: "individual_purchase",
       note: "You finished the course.",
     });
   });
@@ -554,7 +555,7 @@ describe("notifying the buyer of a decline", () => {
       kind: "refund-declined",
       recipients: [{ id: priya.id, name: "Priya" }],
       url: "/team",
-      teamLicence: true,
+      purchaseKind: "team_licence",
       note: "Seats are in use.",
     });
   });

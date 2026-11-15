@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { createTestDb, seedBaseData } from "~/test/setup";
 import * as schema from "~/db/schema";
 import { createComment } from "./comments.server";
@@ -285,6 +286,23 @@ describe("createComment", () => {
         recipients: [{ id: base.instructor.id, name: "Test Instructor" }],
         actor: { id: admin.id, name: "Ops" },
       });
+    });
+
+    it("isn't sent when the course's Instructor is a Platform Admin", () => {
+      db.update(schema.users)
+        .set({ role: schema.UserRole.Admin })
+        .where(eq(schema.users.id, base.instructor.id))
+        .run();
+
+      const { notification } = createComment(
+        db,
+        base.user.id,
+        lessonId,
+        null,
+        "How do I start?"
+      );
+
+      expect(notification).toBeNull();
     });
   });
 });

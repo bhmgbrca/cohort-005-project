@@ -1,8 +1,9 @@
 import { and, count, eq, isNotNull } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "~/db/schema";
-import { coupons, courses, enrollments, purchases, users } from "~/db/schema";
-import type { Notification, Person } from "~/lib/notifier.server";
+import { coupons, courses, enrollments, purchases } from "~/db/schema";
+import type { Notification } from "~/lib/notifier.server";
+import { getPerson } from "~/lib/people.server";
 import { getSeatAvailability } from "~/lib/refunds.server";
 
 // ─── Seats ───
@@ -23,14 +24,6 @@ export const SEAT_REFUNDED =
 export type ClaimSeatResult =
   | { ok: true; enrollment: Enrollment; notification: Notification | null }
   | { ok: false; error: string };
-
-function getPerson(db: Db, userId: number): Person | undefined {
-  return db
-    .select({ id: users.id, name: users.name })
-    .from(users)
-    .where(eq(users.id, userId))
-    .get();
-}
 
 function countSeats(db: Db, purchaseId: number) {
   const total = db
@@ -98,11 +91,11 @@ export function claimSeat(
 ): ClaimSeatResult {
   const seat = db.select().from(coupons).where(eq(coupons.code, code)).get();
   if (!seat) {
-    return { ok: false, error: "Coupon not found" };
+    return { ok: false, error: "Seat not found" };
   }
 
   if (seat.redeemedByUserId !== null) {
-    return { ok: false, error: "Coupon has already been redeemed" };
+    return { ok: false, error: "This Seat has already been claimed" };
   }
 
   const availability = getSeatAvailability(db, seat);
@@ -138,7 +131,7 @@ export function claimSeat(
     return {
       ok: false,
       error:
-        "This coupon can only be redeemed from the same country as the purchaser",
+        "This Seat can only be claimed from the country the Team Licence was bought in",
     };
   }
 

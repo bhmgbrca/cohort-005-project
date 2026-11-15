@@ -82,7 +82,7 @@ describe("claimSeat", () => {
   it("refuses an unknown code", () => {
     expect(claimSeat(db, "NOPE", base.user.id, "")).toEqual({
       ok: false,
-      error: "Coupon not found",
+      error: "Seat not found",
     });
   });
 
@@ -93,7 +93,7 @@ describe("claimSeat", () => {
 
     expect(claimSeat(db, seats[0].code, other.id, "")).toEqual({
       ok: false,
-      error: "Coupon has already been redeemed",
+      error: "This Seat has already been claimed",
     });
   });
 
@@ -144,7 +144,7 @@ describe("claimSeat", () => {
     expect(claimSeat(db, seats[0].code, base.user.id, "US")).toEqual({
       ok: false,
       error:
-        "This coupon can only be redeemed from the same country as the purchaser",
+        "This Seat can only be claimed from the country the Team Licence was bought in",
     });
     expect(claimSeat(db, seats[0].code, base.user.id, "BR")).toMatchObject({
       ok: true,

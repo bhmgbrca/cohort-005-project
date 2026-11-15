@@ -74,7 +74,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   }
 
   // Before the email, so an email failure can't stop the Notification.
-  if (result.notification) await notify(result.notification);
+  await notify(result.notification);
   await sendEmail(result.email);
 
   return redirect(result.kind === "team_licence" ? "/team" : "/settings");
