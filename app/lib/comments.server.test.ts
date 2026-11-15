@@ -132,4 +132,99 @@ describe("createComment", () => {
     );
     expect(comment.body).toHaveLength(5000);
   });
+
+  describe("Reply to your Question Notification", () => {
+    it("tells the asker the Instructor answered their Question, linking to the Reply", () => {
+      const { comment: question } = createComment(
+        db,
+        base.user.id,
+        lessonId,
+        null,
+        "How do I start?"
+      );
+
+      const { comment: reply, notification } = createComment(
+        db,
+        base.instructor.id,
+        lessonId,
+        question.id,
+        "Watch the intro first."
+      );
+
+      expect(notification).toEqual({
+        kind: "reply-to-question",
+        recipients: [{ id: base.user.id, name: "Test User" }],
+        actor: { id: base.instructor.id, name: "Test Instructor" },
+        url: `/courses/test-course/lessons/${lessonId}#comment-${reply.id}`,
+        questionId: question.id,
+        replyId: reply.id,
+        lessonTitle: "Lesson 1",
+        answered: true,
+      });
+    });
+
+    function addUser(name: string, role: schema.UserRole) {
+      return db
+        .insert(schema.users)
+        .values({ name, email: `${name.toLowerCase()}@example.com`, role })
+        .returning()
+        .get();
+    }
+
+    function askQuestion() {
+      return createComment(db, base.user.id, lessonId, null, "How?").comment;
+    }
+
+    it("says another Student replied to, not answered, the Question", () => {
+      const question = askQuestion();
+      const other = addUser("Mia", schema.UserRole.Student);
+
+      const { notification } = createComment(
+        db,
+        other.id,
+        lessonId,
+        question.id,
+        "Same question here."
+      );
+
+      expect(notification).toMatchObject({
+        kind: "reply-to-question",
+        recipients: [{ id: base.user.id, name: "Test User" }],
+        actor: { id: other.id, name: "Mia" },
+        answered: false,
+      });
+    });
+
+    it("says a Platform Admin answered the Question", () => {
+      const question = askQuestion();
+      const admin = addUser("Ops", schema.UserRole.Admin);
+
+      const { notification } = createComment(
+        db,
+        admin.id,
+        lessonId,
+        question.id,
+        "Here's how."
+      );
+
+      expect(notification).toMatchObject({
+        actor: { id: admin.id, name: "Ops" },
+        answered: true,
+      });
+    });
+
+    it("doesn't notify anyone of a Reply to their own Question", () => {
+      const question = askQuestion();
+
+      const { notification } = createComment(
+        db,
+        base.user.id,
+        lessonId,
+        question.id,
+        "Never mind, found it."
+      );
+
+      expect(notification).toBeNull();
+    });
+  });
 });

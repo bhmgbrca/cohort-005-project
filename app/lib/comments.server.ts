@@ -1,8 +1,20 @@
 import { eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "~/db/schema";
-import { comments, courses, lessons, modules } from "~/db/schema";
-import { MAX_COMMENT_LENGTH, MIN_COMMENT_LENGTH } from "~/lib/comments";
+import {
+  comments,
+  courses,
+  lessons,
+  modules,
+  UserRole,
+  users,
+} from "~/db/schema";
+import {
+  commentUrl,
+  MAX_COMMENT_LENGTH,
+  MIN_COMMENT_LENGTH,
+} from "~/lib/comments";
+import type { Notification, Person } from "~/lib/notifier.server";
 
 // ─── Comments ───
 // Posting Questions and Replies under a lesson. See GLOSSARY.md, "Questions".
@@ -34,7 +46,12 @@ function getCommentById(db: Db, commentId: number) {
 
 function getCourseForLesson(db: Db, lessonId: number) {
   return db
-    .select({ courseId: courses.id, instructorId: courses.instructorId })
+    .select({
+      courseId: courses.id,
+      courseSlug: courses.slug,
+      instructorId: courses.instructorId,
+      lessonTitle: lessons.title,
+    })
     .from(lessons)
     .innerJoin(modules, eq(lessons.moduleId, modules.id))
     .innerJoin(courses, eq(modules.courseId, courses.id))
@@ -42,10 +59,56 @@ function getCourseForLesson(db: Db, lessonId: number) {
     .get();
 }
 
+function getUser(db: Db, userId: number) {
+  return db
+    .select({ id: users.id, name: users.name, role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .get();
+}
+
+function toPerson(user: { id: number; name: string }): Person {
+  return { id: user.id, name: user.name };
+}
+
+type Course = NonNullable<ReturnType<typeof getCourseForLesson>>;
+
+/**
+ * Reply to your Question (E), for the asker. `null` when they Replied to
+ * their own Question. "Answered" when the Reply makes it an Answered Question.
+ */
+function replyNotification(
+  db: Db,
+  course: Course,
+  question: Comment,
+  reply: Comment
+): Notification | null {
+  if (reply.userId === question.userId) return null;
+
+  const asker = getUser(db, question.userId);
+  const author = getUser(db, reply.userId);
+  if (!asker || !author) return null;
+
+  return {
+    kind: "reply-to-question",
+    recipients: [toPerson(asker)],
+    actor: toPerson(author),
+    url: commentUrl(course.courseSlug, reply.lessonId, reply.id),
+    questionId: question.id,
+    replyId: reply.id,
+    lessonTitle: course.lessonTitle,
+    answered:
+      author.id === course.instructorId || author.role === UserRole.Admin,
+  };
+}
+
 /**
  * Posts a Question (`parentId` null) or a Reply to a Question on a lesson.
  * Throws an Error with a user-facing message when the body or parent is
  * invalid; nobody can reply to a Reply.
+ *
+ * Returns the Notification it causes, if any, for the route to `notify` after
+ * the write.
  */
 export function createComment(
   db: Db,
@@ -53,15 +116,17 @@ export function createComment(
   lessonId: number,
   parentId: number | null,
   body: string
-): { comment: Comment } {
+): { comment: Comment; notification: Notification | null } {
   const trimmed = assertValidCommentBody(body);
 
-  if (!getCourseForLesson(db, lessonId)) {
+  const course = getCourseForLesson(db, lessonId);
+  if (!course) {
     throw new Error("Lesson not found");
   }
 
+  let parent: Comment | undefined;
   if (parentId !== null) {
-    const parent = getCommentById(db, parentId);
+    parent = getCommentById(db, parentId);
     if (!parent) {
       throw new Error("Parent comment not found");
     }
@@ -79,5 +144,9 @@ export function createComment(
     .returning()
     .get();
 
-  return { comment };
+  const notification = parent
+    ? replyNotification(db, course, parent, comment)
+    : null;
+
+  return { comment, notification };
 }
