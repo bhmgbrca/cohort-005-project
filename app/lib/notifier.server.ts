@@ -118,11 +118,12 @@ export function notificationText(notification: Notification): string {
     case "refund-approved": {
       const ended =
         notification.purchaseKind === "team_licence"
-        ? "Your Unclaimed Seats can no longer be claimed."
-        : "Your Enrollment has ended.";
+          ? "Your Unclaimed Seats can no longer be claimed."
+          : "Your Enrollment has ended.";
       const text = `**Refund approved** for *${notification.courseTitle}*. ${formatPrice(notification.amountPaid)} is on its way back to you. ${ended}`;
       return notification.note
-        ? `${text}\n"${shortenNote(notification.note)}"`
+        ? // A blank line: markdown renders a single newline as a space.
+          `${text}\n\n"${shortenNote(notification.note)}"`
         : text;
     }
     case "refund-declined":
@@ -259,7 +260,9 @@ const USER_TOKEN_LIFETIME_SECONDS = 60 * 60;
  * Signs a 1-hour Knock user token (RS256, locally) for the person's feed.
  * Returns `null` when the Knock keys aren't configured, so there's no bell.
  */
-export async function getFeedConfig(userId: number): Promise<FeedConfig | null> {
+export async function getFeedConfig(
+  userId: number
+): Promise<FeedConfig | null> {
   const publicApiKey = process.env.KNOCK_PUBLIC_API_KEY;
   const feedChannelId = process.env.KNOCK_FEED_CHANNEL_ID;
   // Base64-encoded PEM or raw PEM; Knock accepts either as-is.

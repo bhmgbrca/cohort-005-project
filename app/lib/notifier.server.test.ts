@@ -111,16 +111,16 @@ describe("notificationText for Refund Request approved", () => {
     );
   });
 
-  it("puts the admin's note on a new line", () => {
+  it("puts the Platform Admin's note on a new line, as its own paragraph", () => {
     expect(notificationText(refundApproved({ note: "Sorry it didn't work out." }))).toBe(
-      '**Refund approved** for *Intro to Testing*. $79.00 is on its way back to you. Your Enrollment has ended.\n"Sorry it didn\'t work out."'
+      '**Refund approved** for *Intro to Testing*. $79.00 is on its way back to you. Your Enrollment has ended.\n\n"Sorry it didn\'t work out."'
     );
   });
 
   it("cuts a long note to 200 characters with an ellipsis", () => {
     const note = "a".repeat(199) + "bc";
     expect(notificationText(refundApproved({ note }))).toBe(
-      `**Refund approved** for *Intro to Testing*. $79.00 is on its way back to you. Your Enrollment has ended.\n"${"a".repeat(199)}b…"`
+      `**Refund approved** for *Intro to Testing*. $79.00 is on its way back to you. Your Enrollment has ended.\n\n"${"a".repeat(199)}b…"`
     );
   });
 
@@ -131,7 +131,7 @@ describe("notificationText for Refund Request approved", () => {
 });
 
 describe("notificationText for Refund Request declined", () => {
-  it("quotes the admin's note and reassures the buyer", () => {
+  it("quotes the Platform Admin's note and reassures the buyer", () => {
     expect(notificationText(refundDeclined())).toBe(
       '**Refund declined** for *Intro to Testing*: "You finished the course." You still have everything you bought.'
     );
