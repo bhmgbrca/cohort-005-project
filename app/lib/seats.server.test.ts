@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { createTestDb, seedBaseData } from "~/test/setup";
 import * as schema from "~/db/schema";
 import { RefundStatus, UserRole } from "~/db/schema";
+import { listTeamLicences } from "./refunds.server";
 import { claimSeat, SEAT_ON_HOLD, SEAT_REFUNDED } from "./seats.server";
 
 type TestDb = ReturnType<typeof createTestDb>;
@@ -181,6 +182,27 @@ describe("claimSeat: Seat claimed Notification", () => {
     expect(result.ok && result.notification).toMatchObject({
       claimed: 1,
       total: 2,
+    });
+  });
+
+  it("counts Claimed Seats the same way the team page does", () => {
+    const { purchase, seats } = buySeats(teamAdmin.id, 3);
+    // A Seat with a claimant but no claim time is not a Claimed Seat.
+    const other = createStudent("Other Student");
+    db.update(schema.coupons)
+      .set({ redeemedByUserId: other.id })
+      .where(eq(schema.coupons.id, seats[2].id))
+      .run();
+
+    const result = claimSeat(db, seats[0].code, base.user.id, "");
+
+    const [licence] = listTeamLicences(db, teamAdmin.id, new Date()).filter(
+      (l) => l.purchaseId === purchase.id
+    );
+    expect(licence.claimedSeatCount).toBe(1);
+    expect(result.ok && result.notification).toMatchObject({
+      claimed: 1,
+      total: 3,
     });
   });
 

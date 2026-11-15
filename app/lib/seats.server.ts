@@ -1,10 +1,14 @@
-import { and, count, eq, isNotNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Db } from "~/db";
 import { coupons, enrollments, purchases } from "~/db/schema";
 import { getCourseTitle } from "~/lib/courses.server";
 import type { Notification } from "~/lib/notifier.server";
 import { getPerson } from "~/lib/people.server";
-import { getSeatAvailability } from "~/lib/refunds.server";
+import {
+  getSeatAvailability,
+  getSeats,
+  isClaimed,
+} from "~/lib/refunds.server";
 
 // ─── Seats ───
 // A Student claiming a Seat on a Team Licence. See GLOSSARY.md, "Seat".
@@ -25,22 +29,8 @@ export type ClaimSeatResult =
   | { ok: false; error: string };
 
 function countSeats(db: Db, purchaseId: number) {
-  const total = db
-    .select({ n: count() })
-    .from(coupons)
-    .where(eq(coupons.purchaseId, purchaseId))
-    .get();
-  const claimed = db
-    .select({ n: count() })
-    .from(coupons)
-    .where(
-      and(
-        eq(coupons.purchaseId, purchaseId),
-        isNotNull(coupons.redeemedByUserId)
-      )
-    )
-    .get();
-  return { claimed: claimed?.n ?? 0, total: total?.n ?? 0 };
+  const seats = getSeats(db, purchaseId);
+  return { claimed: seats.filter(isClaimed).length, total: seats.length };
 }
 
 /**

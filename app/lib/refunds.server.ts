@@ -69,7 +69,8 @@ function getPurchase(db: Queryable, purchaseId: number) {
   return db.select().from(purchases).where(eq(purchases.id, purchaseId)).get();
 }
 
-function getSeats(db: Queryable, purchaseId: number): Seat[] {
+/** Every Seat on a Purchase; none for an Individual Purchase. */
+export function getSeats(db: Queryable, purchaseId: number): Seat[] {
   return db
     .select()
     .from(coupons)
@@ -77,7 +78,8 @@ function getSeats(db: Queryable, purchaseId: number): Seat[] {
     .all();
 }
 
-function isClaimed(seat: Seat) {
+/** Whether a Student has claimed this Seat: a Claimed Seat. */
+export function isClaimed(seat: Seat) {
   return seat.redeemedAt !== null;
 }
 
