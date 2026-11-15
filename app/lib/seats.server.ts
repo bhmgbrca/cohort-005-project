@@ -4,6 +4,7 @@ import { coupons, enrollments, purchases } from "~/db/schema";
 import { getCourseTitle } from "~/lib/courses.server";
 import type { Notification } from "~/lib/notifier.server";
 import { getPerson } from "~/lib/people.server";
+import { purchasePagePath } from "~/lib/purchases";
 import {
   getSeatAvailability,
   getSeats,
@@ -54,7 +55,7 @@ function seatClaimedNotification(
     kind: "seat-claimed",
     recipients: [teamAdmin],
     actor: student,
-    url: "/team",
+    url: purchasePagePath("team_licence"),
     seatId: seat.id,
     courseTitle,
     ...countSeats(db, seat.purchaseId),

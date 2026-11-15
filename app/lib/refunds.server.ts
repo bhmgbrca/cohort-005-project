@@ -23,10 +23,13 @@ import {
   REFUND_COMPLETION_LIMIT,
   REFUND_WATCH_LIMIT_SECONDS,
   REFUND_WINDOW_DAYS,
-  purchasePagePath,
-  type PurchaseKind,
   type RuleBreak,
 } from "~/lib/refund-rules";
+import {
+  ADMIN_REFUNDS_PATH,
+  purchasePagePath,
+  type PurchaseKind,
+} from "~/lib/purchases";
 
 // ─── Refunds ───
 // Everything about Refund Requests: whether a Purchase may be refunded, raising
@@ -83,6 +86,7 @@ export function isClaimed(seat: Seat) {
   return seat.redeemedAt !== null;
 }
 
+/** A Team Licence is the Purchase that granted Seats (see PURCHASE_KINDS). */
 function kindOf(seats: Seat[]): PurchaseKind {
   return seats.length > 0 ? "team_licence" : "individual_purchase";
 }
@@ -405,7 +409,7 @@ export function raiseRefundRequest(
             kind: "new-refund-request",
             recipients: platformAdmins,
             actor: { id: buyer.id, name: buyer.name },
-            url: "/admin/refunds",
+            url: ADMIN_REFUNDS_PATH,
             refundRequestId: refundRequest.id,
             courseTitle: course.title,
             amountPaid: purchase.amountPaid,
