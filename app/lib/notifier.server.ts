@@ -42,10 +42,19 @@ export type NewRefundRequestNotification = NotificationBase & {
   purchaseKind: "individual_purchase" | "team_licence";
 };
 
+/** F: someone asked a Question on one of the recipient's lessons. */
+export type NewQuestionNotification = NotificationBase & {
+  kind: "new-question";
+  questionId: number;
+  lessonTitle: string;
+  courseTitle: string;
+};
+
 /** One variant per launch Notification, distinguished by `kind`. */
 export type Notification =
   | ReplyToQuestionNotification
-  | NewRefundRequestNotification;
+  | NewRefundRequestNotification
+  | NewQuestionNotification;
 
 /** The markdown body shown in the feed. */
 export function notificationText(notification: Notification): string {
@@ -61,6 +70,8 @@ export function notificationText(notification: Notification): string {
           : "Individual Purchase";
       return `**New Refund Request** from ${notification.actor.name} for *${notification.courseTitle}*: ${formatPrice(notification.amount)}, ${purchaseKind}.`;
     }
+    case "new-question":
+      return `${notification.actor.name} **asked a Question** on *${notification.lessonTitle}* in *${notification.courseTitle}*.`;
   }
 }
 
@@ -142,6 +153,8 @@ function triggeringRecord(notification: Notification): string {
       return `reply ${notification.replyId} on question ${notification.questionId}`;
     case "new-refund-request":
       return `refund request ${notification.refundRequestId}`;
+    case "new-question":
+      return `question ${notification.questionId}`;
   }
 }
 
