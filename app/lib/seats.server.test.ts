@@ -3,7 +3,14 @@ import { eq } from "drizzle-orm";
 import { createTestDb, seedBaseData } from "~/test/setup";
 import * as schema from "~/db/schema";
 import { RefundStatus, UserRole } from "~/db/schema";
-import { claimSeat, SEAT_ON_HOLD, SEAT_REFUNDED } from "./seats.server";
+import { listTeamLicences } from "./refunds.server";
+import {
+  claimSeat,
+  findClaimBlock,
+  getSeatByCode,
+  SEAT_ON_HOLD,
+  SEAT_REFUNDED,
+} from "./seats.server";
 
 type TestDb = ReturnType<typeof createTestDb>;
 
@@ -152,6 +159,35 @@ describe("claimSeat", () => {
   });
 });
 
+describe("findClaimBlock", () => {
+  it("is null for an Unclaimed Seat the Student can claim", () => {
+    const { seats } = buySeats(teamAdmin.id, 1, "BR");
+    const seat = getSeatByCode(db, seats[0].code);
+    if (!seat) throw new Error("no seat");
+
+    expect(findClaimBlock(db, seat, base.user.id, "BR")).toBeNull();
+    expect(findClaimBlock(db, seat, base.user.id, "US")).toBe("wrong_country");
+  });
+
+  it("says an enrolled Student is enrolled even while the Seat is on hold", () => {
+    const { purchase, seats } = buySeats(teamAdmin.id, 1);
+    db.insert(schema.enrollments)
+      .values({ userId: base.user.id, courseId: base.course.id })
+      .run();
+    db.insert(schema.refunds)
+      .values({
+        purchaseId: purchase.id,
+        status: RefundStatus.Open,
+        reason: "Changed plans",
+      })
+      .run();
+    const seat = getSeatByCode(db, seats[0].code);
+    if (!seat) throw new Error("no seat");
+
+    expect(findClaimBlock(db, seat, base.user.id, "")).toBe("enrolled");
+  });
+});
+
 describe("claimSeat: Seat claimed Notification", () => {
   it("tells the Team Admin who bought the Team Licence, with the counts at that moment", () => {
     const { seats } = buySeats(teamAdmin.id, 3);
@@ -181,6 +217,27 @@ describe("claimSeat: Seat claimed Notification", () => {
     expect(result.ok && result.notification).toMatchObject({
       claimed: 1,
       total: 2,
+    });
+  });
+
+  it("counts Claimed Seats the same way the team page does", () => {
+    const { purchase, seats } = buySeats(teamAdmin.id, 3);
+    // A Seat with a claimant but no claim time is not a Claimed Seat.
+    const other = createStudent("Other Student");
+    db.update(schema.coupons)
+      .set({ redeemedByUserId: other.id })
+      .where(eq(schema.coupons.id, seats[2].id))
+      .run();
+
+    const result = claimSeat(db, seats[0].code, base.user.id, "");
+
+    const [licence] = listTeamLicences(db, teamAdmin.id, new Date()).filter(
+      (l) => l.purchaseId === purchase.id
+    );
+    expect(licence.claimedSeatCount).toBe(1);
+    expect(result.ok && result.notification).toMatchObject({
+      claimed: 1,
+      total: 3,
     });
   });
 

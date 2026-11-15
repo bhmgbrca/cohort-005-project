@@ -7,7 +7,7 @@ import { courses, purchases } from "~/db/schema";
 import { eq } from "drizzle-orm";
 import { parseFormData, parseParams } from "~/lib/validation";
 import { raiseRefundRequest } from "~/lib/refunds.server";
-import { purchasePagePath } from "~/lib/refund-rules";
+import { purchasePagePath } from "~/lib/purchases";
 import { sendEmail } from "~/lib/mailer.server";
 import { notify } from "~/lib/notifier.server";
 

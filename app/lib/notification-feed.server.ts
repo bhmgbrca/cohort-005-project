@@ -4,6 +4,8 @@
 // signed here. The token only grants that person's own feed.
 
 import { signUserToken } from "@knocklabs/node";
+// Loads .env, so the Knock keys below are set whichever module runs first.
+import "~/lib/env.server";
 
 /** What the sidebar's Notification feed needs. Safe to send to the browser. */
 export type FeedConfig = {

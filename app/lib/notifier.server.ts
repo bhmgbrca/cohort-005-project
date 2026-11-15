@@ -10,7 +10,7 @@
 import Knock from "@knocklabs/node";
 import { isUnderVitest } from "~/lib/env.server";
 import type { Person } from "~/lib/people.server";
-import type { PurchaseKind } from "~/lib/refund-rules";
+import { PURCHASE_KINDS, type PurchaseKind } from "~/lib/purchases";
 import { formatPrice } from "~/lib/utils";
 
 /** The Purchase a Refund Request is about, the same in every refund Notification. */
@@ -105,20 +105,14 @@ export function notificationText(notification: Notification): string {
       return `${notification.actor.name} **${verb}** your Question on *${notification.lessonTitle}*.`;
     }
     case "new-refund-request": {
-      const purchaseKind =
-        notification.purchaseKind === "team_licence"
-          ? "Team Licence"
-          : "Individual Purchase";
-      return `**New Refund Request** from ${notification.actor.name} for *${notification.courseTitle}*: ${formatPrice(notification.amountPaid)}, ${purchaseKind}.`;
+      const { label } = PURCHASE_KINDS[notification.purchaseKind];
+      return `**New Refund Request** from ${notification.actor.name} for *${notification.courseTitle}*: ${formatPrice(notification.amountPaid)}, ${label}.`;
     }
     case "new-question":
       return `${notification.actor.name} **asked a Question** on *${notification.lessonTitle}* in *${notification.courseTitle}*.`;
     case "refund-approved": {
-      const ended =
-        notification.purchaseKind === "team_licence"
-          ? "Your Unclaimed Seats can no longer be claimed."
-          : "Your Enrollment has ended.";
-      const text = `**Refund approved** for *${notification.courseTitle}*. ${formatPrice(notification.amountPaid)} is on its way back to you. ${ended}`;
+      const { refundEnds } = PURCHASE_KINDS[notification.purchaseKind];
+      const text = `**Refund approved** for *${notification.courseTitle}*. ${formatPrice(notification.amountPaid)} is on its way back to you. ${refundEnds}`;
       return notification.note
         ? // A blank line: markdown renders a single newline as a space.
           `${text}\n\n"${shortenNote(notification.note)}"`
