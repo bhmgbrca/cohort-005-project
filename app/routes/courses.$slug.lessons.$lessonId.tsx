@@ -55,6 +55,7 @@ import { data, isRouteErrorResponse } from "react-router";
 import { z } from "zod";
 import { COUNTRIES } from "~/lib/ppp";
 import { parseFormData, parseParams } from "~/lib/validation";
+import { sendNewQuestion } from "~/lib/knock-prototype.server"; // PROTOTYPE
 
 const lessonParamsSchema = z.object({
   slug: z.string().min(1),
@@ -900,12 +901,27 @@ export async function action({ params, request }: Route.ActionArgs) {
         if (!parsed.success) {
           return { ok: false, error: "Enter a comment before posting." };
         }
-        createComment(
+        const created = createComment(
           currentUserId,
           lessonId,
           parsed.data.parentId ?? null,
           parsed.data.body
         );
+        // PROTOTYPE: New Question → the course's Instructor, unless they asked it.
+        if (created.parentId === null && course.instructorId !== currentUserId) {
+          const asker = db.select().from(users).where(eq(users.id, currentUserId)).get();
+          const instructor = db.select().from(users).where(eq(users.id, course.instructorId)).get();
+          const lesson = db.select().from(lessons).where(eq(lessons.id, lessonId)).get();
+          if (asker && instructor && lesson) {
+            await sendNewQuestion({
+              asker,
+              instructor,
+              courseTitle: course.title,
+              lessonTitle: lesson.title,
+              url: `/courses/${course.slug}/lessons/${lessonId}#comment-${created.id}`,
+            });
+          }
+        }
         return { ok: true };
       }
 
