@@ -120,6 +120,24 @@ describe("notificationText for Refund Request declined", () => {
   });
 });
 
+describe("notificationText for New Question", () => {
+  it("names the asker, lesson and course", () => {
+    expect(
+      notificationText({
+        kind: "new-question",
+        recipients: [{ id: 2, name: "Ada Instructor" }],
+        actor: { id: 1, name: "Liam Student" },
+        url: "/courses/intro/lessons/7#comment-11",
+        questionId: 11,
+        lessonTitle: "Getting Started",
+        courseTitle: "Intro to Cadence",
+      })
+    ).toBe(
+      "Liam Student **asked a Question** on *Getting Started* in *Intro to Cadence*."
+    );
+  });
+});
+
 describe("notify", () => {
   afterEach(() => {
     vi.restoreAllMocks();
