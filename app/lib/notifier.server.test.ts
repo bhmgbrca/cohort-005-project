@@ -321,12 +321,13 @@ describe("getFeedConfig", () => {
       feedChannelId: "feed-channel-id",
       userId: "42",
     });
-    const [header, payload] = config!.userToken.split(".");
+    if (!config) throw new Error("expected a feed config");
+    const [header, payload] = config.userToken.split(".");
     expect(decodeSegment(header).alg).toBe("RS256");
     const claims = decodeSegment(payload);
     expect(claims.sub).toBe("42");
     expect(claims.exp).toBe(Date.parse("2026-11-14T13:00:00Z") / 1000);
-    expect(verifiesWith(config!.userToken, publicKey)).toBe(true);
+    expect(verifiesWith(config.userToken, publicKey)).toBe(true);
   });
 
   it("accepts the signing key as a raw PEM too", async () => {
@@ -335,7 +336,8 @@ describe("getFeedConfig", () => {
 
     const config = await getFeedConfig(7);
 
-    expect(config?.userId).toBe("7");
-    expect(verifiesWith(config!.userToken, publicKey)).toBe(true);
+    if (!config) throw new Error("expected a feed config");
+    expect(config.userId).toBe("7");
+    expect(verifiesWith(config.userToken, publicKey)).toBe(true);
   });
 });
