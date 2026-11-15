@@ -396,25 +396,17 @@ export function raiseRefundRequest(
     .get();
 
   const kind = kindOf(getSeats(db, purchase.id));
-  const platformAdmins = getPlatformAdminsExcept(db, buyer.id);
 
   return {
     ok: true,
     refundRequestId: refundRequest.id,
     kind,
-    notification:
-      platformAdmins.length === 0
-        ? null
-        : {
-            kind: "new-refund-request",
-            recipients: platformAdmins,
-            actor: { id: buyer.id, name: buyer.name },
-            url: ADMIN_REFUNDS_PATH,
-            refundRequestId: refundRequest.id,
-            courseTitle: course.title,
-            amountPaid: purchase.amountPaid,
-            purchaseKind: kind,
-          },
+    notification: buildNewRefundRequestNotification(
+      db,
+      refundRequest.id,
+      purchase,
+      kind
+    ),
     email: {
       to: buyer.email,
       subject: `Refund requested — ${course.title}`,
@@ -429,6 +421,35 @@ export function raiseRefundRequest(
         "— The Cadence team",
       ].join("\n"),
     },
+  };
+}
+
+/**
+ * New Refund Request (C), to every Platform Admin but the buyer. `null` when
+ * there is no other Platform Admin, or the buyer or course can't be found.
+ */
+function buildNewRefundRequestNotification(
+  db: Queryable,
+  refundRequestId: number,
+  purchase: Purchase,
+  purchaseKind: PurchaseKind
+): Notification | null {
+  const platformAdmins = getPlatformAdminsExcept(db, purchase.userId);
+  if (platformAdmins.length === 0) return null;
+
+  const buyer = getPerson(db, purchase.userId);
+  const courseTitle = getCourseTitle(db, purchase.courseId);
+  if (!buyer || !courseTitle) return null;
+
+  return {
+    kind: "new-refund-request",
+    recipients: platformAdmins,
+    actor: buyer,
+    url: ADMIN_REFUNDS_PATH,
+    refundRequestId,
+    courseTitle,
+    amountPaid: purchase.amountPaid,
+    purchaseKind,
   };
 }
 
