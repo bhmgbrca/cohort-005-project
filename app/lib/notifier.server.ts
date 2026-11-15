@@ -52,7 +52,7 @@ export type NewRefundRequestNotification = NotificationBase &
 export type RefundApprovedNotification = NotificationBase &
   RefundRequestFacts & {
     kind: "refund-approved";
-    /** The admin's note in full; the feed shortens it. */
+    /** The Platform Admin's note in full; the feed shortens it. */
     note: string | null;
   };
 
@@ -60,7 +60,7 @@ export type RefundApprovedNotification = NotificationBase &
 export type RefundDeclinedNotification = NotificationBase &
   RefundRequestFacts & {
     kind: "refund-declined";
-    /** The admin's note in full; the feed shortens it. Always present. */
+    /** The Platform Admin's note in full; the feed shortens it. Always present. */
     note: string;
   };
 
@@ -92,7 +92,7 @@ export type Notification =
   | RefundDeclinedNotification
   | SeatClaimedNotification;
 
-/** Admin notes longer than this are cut in the feed; the email has them in full. */
+/** Platform Admin notes longer than this are cut in the feed; the email has them in full. */
 const NOTE_LIMIT = 200;
 
 function shortenNote(note: string): string {

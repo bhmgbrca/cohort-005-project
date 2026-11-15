@@ -785,8 +785,8 @@ export function declineRefundRequest(
 
 /**
  * Refund Request approved (A) or declined (B), to the buyer from the deciding
- * Platform Admin. `null` when the admin decided their own Refund Request, or
- * when the buyer, admin or course can't be found.
+ * Platform Admin. `null` when the Platform Admin decided their own Refund
+ * Request, or when the buyer, Platform Admin or course can't be found.
  */
 function buildDecisionNotification(
   db: Queryable,

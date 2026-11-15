@@ -455,7 +455,7 @@ describe("approving a Refund Request", () => {
 });
 
 describe("notifying the buyer of an approval", () => {
-  it("sends A to the buyer of an Individual Purchase, from the deciding admin, linking to settings", () => {
+  it("sends A to the buyer of an Individual Purchase, from the deciding Platform Admin, linking to settings", () => {
     const purchase = buyForSelf(base.user.id);
     const id = raise(purchase.id, base.user.id);
 
@@ -475,7 +475,7 @@ describe("notifying the buyer of an approval", () => {
     });
   });
 
-  it("sends A for a Team Licence with the admin's note, linking to the team page", () => {
+  it("sends A for a Team Licence with the Platform Admin's note, linking to the team page", () => {
     const priya = addLearner("Priya");
     const { purchase } = buySeats(priya.id, 2);
     const id = raise(purchase.id, priya.id);
@@ -499,7 +499,7 @@ describe("notifying the buyer of an approval", () => {
     });
   });
 
-  it("sends nothing when the admin decides their own Refund Request", () => {
+  it("sends nothing when the Platform Admin decides their own Refund Request", () => {
     const purchase = buyForSelf(platformAdmin.id);
     const id = raise(purchase.id, platformAdmin.id);
 
