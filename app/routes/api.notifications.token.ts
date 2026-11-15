@@ -1,7 +1,8 @@
 import { data } from "react-router";
 import type { Route } from "./+types/api.notifications.token";
 import { getCurrentUserId } from "~/lib/session";
-import { getFeedConfig } from "~/lib/notifier.server";
+import { getFeedConfig } from "~/lib/notification-feed.server";
+import type { RefreshedToken } from "~/lib/notification-feed";
 
 /**
  * A fresh Knock user token for the session user, so the Notification feed
@@ -21,5 +22,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     throw data("Notifications aren't configured", { status: 401 });
   }
 
-  return { userId: feed.userId, token: feed.userToken };
+  return {
+    userId: feed.userId,
+    token: feed.userToken,
+  } satisfies RefreshedToken;
 }

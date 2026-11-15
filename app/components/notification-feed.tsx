@@ -2,7 +2,7 @@
 // The bell in the sidebar header and Knock's feed popover. See GLOSSARY.md,
 // "Notification", and ADR 0013. The browser reads the person's feed straight
 // from Knock with the public key and a user token signed by the server
-// (`getFeedConfig` in notifier.server.ts).
+// (`getFeedConfig` in notification-feed.server.ts).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -14,9 +14,11 @@ import {
   NotificationIconButton,
 } from "@knocklabs/react";
 import "@knocklabs/react/dist/index.css";
-import type { FeedConfig } from "~/lib/notifier.server";
-
-const TOKEN_REFRESH_URL = "/api/notifications/token";
+import type { FeedConfig } from "~/lib/notification-feed.server";
+import {
+  parseRefreshedToken,
+  TOKEN_REFRESH_URL,
+} from "~/lib/notification-feed";
 
 interface NotificationFeedProps {
   /** `null` when there's no user or no Knock configuration: no bell at all. */
@@ -34,7 +36,9 @@ export function NotificationFeed({ config, colorMode }: NotificationFeedProps) {
   if (!mounted) return <PlainBell />;
 
   // A different user (DevUI switch) gets a fresh Knock client and feed.
-  return <KnockFeed key={config.userId} config={config} colorMode={colorMode} />;
+  return (
+    <KnockFeed key={config.userId} config={config} colorMode={colorMode} />
+  );
 }
 
 function PlainBell() {
@@ -70,14 +74,17 @@ function KnockFeed({
     const response = await fetch(TOKEN_REFRESH_URL, {
       headers: { Accept: "application/json" },
     });
-    if (!response.ok) {
-      // Signed out, Knock unconfigured or a server error: reload rather than
-      // let the feed die silently once the old token expires.
+    const refreshed = response.ok
+      ? parseRefreshedToken(await response.json().catch(() => null))
+      : null;
+    if (!refreshed) {
+      // Signed out, Knock unconfigured, a server error or an unexpected body:
+      // reload rather than let the feed die silently once the old token
+      // expires.
       window.location.reload();
       return;
     }
 
-    const refreshed: { userId: string; token: string } = await response.json();
     if (refreshed.userId !== userId) {
       // This tab is showing someone else's feed; reload as the current user.
       window.location.reload();

@@ -1,7 +1,7 @@
 import { and, count, eq, isNotNull } from "drizzle-orm";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import * as schema from "~/db/schema";
-import { coupons, courses, enrollments, purchases } from "~/db/schema";
+import type { Db } from "~/db";
+import { coupons, enrollments, purchases } from "~/db/schema";
+import { getCourseTitle } from "~/lib/courses.server";
 import type { Notification } from "~/lib/notifier.server";
 import { getPerson } from "~/lib/people.server";
 import { getSeatAvailability } from "~/lib/refunds.server";
@@ -12,7 +12,6 @@ import { getSeatAvailability } from "~/lib/refunds.server";
 // Every function takes the database first, so tests can hand in an in-memory
 // one. Uses positional parameters (project convention).
 
-type Db = BetterSQLite3Database<typeof schema>;
 type Enrollment = typeof enrollments.$inferSelect;
 type Seat = typeof coupons.$inferSelect;
 
@@ -58,12 +57,8 @@ function seatClaimedNotification(
 
   const teamAdmin = getPerson(db, buyerId);
   const student = getPerson(db, studentId);
-  const course = db
-    .select({ title: courses.title })
-    .from(courses)
-    .where(eq(courses.id, seat.courseId))
-    .get();
-  if (!teamAdmin || !student || !course) return null;
+  const courseTitle = getCourseTitle(db, seat.courseId);
+  if (!teamAdmin || !student || !courseTitle) return null;
 
   return {
     kind: "seat-claimed",
@@ -71,7 +66,7 @@ function seatClaimedNotification(
     actor: student,
     url: "/team",
     seatId: seat.id,
-    courseTitle: course.title,
+    courseTitle,
     ...countSeats(db, seat.purchaseId),
   };
 }

@@ -7,13 +7,11 @@
 // and always under Vitest, each one is printed to the console instead. Knock's
 // vocabulary (workflow keys, string ids, data) stays inside `knockTransport`.
 
-import Knock, { signUserToken } from "@knocklabs/node";
+import Knock from "@knocklabs/node";
 import { isUnderVitest } from "~/lib/env.server";
-import type { PurchaseKind } from "~/lib/refunds.server";
+import type { Person } from "~/lib/people.server";
+import type { PurchaseKind } from "~/lib/refund-rules";
 import { formatPrice } from "~/lib/utils";
-
-/** Someone who sends or receives a Notification. Only id and name leave Cadence. */
-export type Person = { id: number; name: string };
 
 /** The Purchase a Refund Request is about, the same in every refund Notification. */
 type RefundRequestFacts = {
@@ -52,7 +50,7 @@ export type NewRefundRequestNotification = NotificationBase &
 export type RefundApprovedNotification = NotificationBase &
   RefundRequestFacts & {
     kind: "refund-approved";
-    /** The admin's note in full; the feed shortens it. */
+    /** The Platform Admin's note in full; the feed shortens it. */
     note: string | null;
   };
 
@@ -60,7 +58,7 @@ export type RefundApprovedNotification = NotificationBase &
 export type RefundDeclinedNotification = NotificationBase &
   RefundRequestFacts & {
     kind: "refund-declined";
-    /** The admin's note in full; the feed shortens it. Always present. */
+    /** The Platform Admin's note in full; the feed shortens it. Always present. */
     note: string;
   };
 
@@ -92,7 +90,7 @@ export type Notification =
   | RefundDeclinedNotification
   | SeatClaimedNotification;
 
-/** Admin notes longer than this are cut in the feed; the email has them in full. */
+/** Platform Admin notes longer than this are cut in the feed; the email has them in full. */
 const NOTE_LIMIT = 200;
 
 function shortenNote(note: string): string {
@@ -118,11 +116,12 @@ export function notificationText(notification: Notification): string {
     case "refund-approved": {
       const ended =
         notification.purchaseKind === "team_licence"
-        ? "Your Unclaimed Seats can no longer be claimed."
-        : "Your Enrollment has ended.";
+          ? "Your Unclaimed Seats can no longer be claimed."
+          : "Your Enrollment has ended.";
       const text = `**Refund approved** for *${notification.courseTitle}*. ${formatPrice(notification.amountPaid)} is on its way back to you. ${ended}`;
       return notification.note
-        ? `${text}\n"${shortenNote(notification.note)}"`
+        ? // A blank line: markdown renders a single newline as a space.
+          `${text}\n\n"${shortenNote(notification.note)}"`
         : text;
     }
     case "refund-declined":
@@ -196,12 +195,11 @@ function triggeringRecord(notification: Notification): string {
     case "reply-to-question":
       return `reply ${notification.replyId} on question ${notification.questionId}`;
     case "new-refund-request":
-      return `refund request ${notification.refundRequestId}`;
-    case "new-question":
-      return `question ${notification.questionId}`;
     case "refund-approved":
     case "refund-declined":
       return `refund request ${notification.refundRequestId}`;
+    case "new-question":
+      return `question ${notification.questionId}`;
     case "seat-claimed":
       return `seat ${notification.seatId}`;
   }
@@ -220,10 +218,14 @@ function describeError(error: unknown): string {
 }
 
 /**
- * Sends a Notification. Never throws: one attempt, at most 3 seconds, and on failure or timeout it logs
- * the kind, recipient ids, triggering record and error, then returns, so the
- * person acting never notices. Does nothing for `null`, so a route can pass a
- * domain function's result straight in.
+ * Sends a Notification. Never throws: one attempt, at most 3 seconds, and on
+ * failure or timeout it logs the kind, recipient ids, triggering record and
+ * error, then returns, so the person acting never notices. Does nothing for
+ * `null`, so a route can pass a domain function's result straight in.
+ *
+ * Call it before sending any email from the same action, so an email failure
+ * can't stop the Notification; since `notify` never throws, it can't stop the
+ * email either.
  */
 export async function notify(
   notification: Notification | null,
@@ -238,38 +240,4 @@ export async function notify(
       `[notify] ${notification.kind} failed (recipients ${recipientIds}; ${triggeringRecord(notification)}): ${describeError(error)}`
     );
   }
-}
-
-// ─── Feed ───
-// The browser reads the person's feed straight from Knock with the public key
-// and a user token signed here. The token only grants that person's own feed.
-
-/** What the sidebar's Notification feed needs. Safe to send to the browser. */
-export type FeedConfig = {
-  publicApiKey: string;
-  feedChannelId: string;
-  /** The Knock user id: the Cadence user id as a string. */
-  userId: string;
-  userToken: string;
-};
-
-const USER_TOKEN_LIFETIME_SECONDS = 60 * 60;
-
-/**
- * Signs a 1-hour Knock user token (RS256, locally) for the person's feed.
- * Returns `null` when the Knock keys aren't configured, so there's no bell.
- */
-export async function getFeedConfig(userId: number): Promise<FeedConfig | null> {
-  const publicApiKey = process.env.KNOCK_PUBLIC_API_KEY;
-  const feedChannelId = process.env.KNOCK_FEED_CHANNEL_ID;
-  // Base64-encoded PEM or raw PEM; Knock accepts either as-is.
-  const signingKey = process.env.KNOCK_SIGNING_KEY;
-  if (!publicApiKey || !feedChannelId || !signingKey) return null;
-
-  const knockUserId = String(userId);
-  const userToken = await signUserToken(knockUserId, {
-    signingKey,
-    expiresInSeconds: USER_TOKEN_LIFETIME_SECONDS,
-  });
-  return { publicApiKey, feedChannelId, userId: knockUserId, userToken };
 }

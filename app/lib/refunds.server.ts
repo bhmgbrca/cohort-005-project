@@ -1,7 +1,5 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
-import * as schema from "~/db/schema";
 import {
   coupons,
   courses,
@@ -15,15 +13,18 @@ import {
   videoWatchEvents,
   LessonProgressStatus,
   RefundStatus,
-  UserRole,
 } from "~/db/schema";
 import { formatPrice } from "~/lib/utils";
-import type { Notification, Person } from "~/lib/notifier.server";
-import { getPerson } from "~/lib/people.server";
+import type { Db, Queryable } from "~/db";
+import type { Notification } from "~/lib/notifier.server";
+import { getCourseTitle } from "~/lib/courses.server";
+import { getPerson, getPlatformAdminsExcept } from "~/lib/people.server";
 import {
   REFUND_COMPLETION_LIMIT,
   REFUND_WATCH_LIMIT_SECONDS,
   REFUND_WINDOW_DAYS,
+  purchasePagePath,
+  type PurchaseKind,
   type RuleBreak,
 } from "~/lib/refund-rules";
 
@@ -34,10 +35,6 @@ import {
 //
 // Every function takes the database first, so tests can hand in an in-memory
 // one. Uses positional parameters (project convention).
-
-export type Db = BetterSQLite3Database<typeof schema>;
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
-type Queryable = Db | Tx;
 
 type Purchase = typeof purchases.$inferSelect;
 type Seat = typeof coupons.$inferSelect;
@@ -83,10 +80,6 @@ function getSeats(db: Queryable, purchaseId: number): Seat[] {
 function isClaimed(seat: Seat) {
   return seat.redeemedAt !== null;
 }
-
-// There is no column saying which kind a Purchase is: a Team Licence is the
-// Purchase that granted Seats, and every Team Licence grants at least one.
-export type PurchaseKind = "individual_purchase" | "team_licence";
 
 function kindOf(seats: Seat[]): PurchaseKind {
   return seats.length > 0 ? "team_licence" : "individual_purchase";
@@ -362,16 +355,6 @@ export type RaiseResult =
       notification: Notification | null;
     }
   | Failure;
-
-/** Everyone who is a Platform Admin right now, except `exceptUserId`. */
-function getPlatformAdminsExcept(db: Queryable, exceptUserId: number): Person[] {
-  return db
-    .select({ id: users.id, name: users.name })
-    .from(users)
-    .where(and(eq(users.role, UserRole.Admin), ne(users.id, exceptUserId)))
-    .orderBy(asc(users.id))
-    .all();
-}
 
 export function raiseRefundRequest(
   db: Db,
@@ -785,8 +768,8 @@ export function declineRefundRequest(
 
 /**
  * Refund Request approved (A) or declined (B), to the buyer from the deciding
- * Platform Admin. `null` when the admin decided their own Refund Request, or
- * when the buyer, admin or course can't be found.
+ * Platform Admin. `null` when the Platform Admin decided their own Refund
+ * Request, or when the buyer, Platform Admin or course can't be found.
  */
 function buildDecisionNotification(
   db: Queryable,
@@ -801,21 +784,17 @@ function buildDecisionNotification(
 
   const buyer = getPerson(db, purchase.userId);
   const platformAdmin = getPerson(db, platformAdminId);
-  const course = db
-    .select({ title: courses.title })
-    .from(courses)
-    .where(eq(courses.id, purchase.courseId))
-    .get();
-  if (!buyer || !platformAdmin || !course) return null;
+  const courseTitle = getCourseTitle(db, purchase.courseId);
+  if (!buyer || !platformAdmin || !courseTitle) return null;
 
   const purchaseKind = kindOf(getSeats(db, purchase.id));
 
   const common = {
     recipients: [buyer],
     actor: platformAdmin,
-    url: purchaseKind === "team_licence" ? "/team" : "/settings",
+    url: purchasePagePath(purchaseKind),
     refundRequestId,
-    courseTitle: course.title,
+    courseTitle,
     amountPaid: purchase.amountPaid,
     purchaseKind,
   };
@@ -841,13 +820,7 @@ function buildDecisionEmail(
     .from(users)
     .where(eq(users.id, purchase.userId))
     .get();
-  const course = db
-    .select()
-    .from(courses)
-    .where(eq(courses.id, purchase.courseId))
-    .get();
-
-  const courseTitle = course?.title ?? "your course";
+  const courseTitle = getCourseTitle(db, purchase.courseId) ?? "your course";
   const noteLines = note ? ["", note] : [];
 
   const middle =
