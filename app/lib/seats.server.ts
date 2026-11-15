@@ -1,8 +1,9 @@
 import { and, count, eq, isNotNull } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "~/db/schema";
-import { coupons, courses, enrollments, purchases, users } from "~/db/schema";
-import type { Notification, Person } from "~/lib/notifier.server";
+import { coupons, courses, enrollments, purchases } from "~/db/schema";
+import type { Notification } from "~/lib/notifier.server";
+import { getPerson } from "~/lib/people.server";
 import { getSeatAvailability } from "~/lib/refunds.server";
 
 // ─── Seats ───
@@ -23,14 +24,6 @@ export const SEAT_REFUNDED =
 export type ClaimSeatResult =
   | { ok: true; enrollment: Enrollment; notification: Notification | null }
   | { ok: false; error: string };
-
-function getPerson(db: Db, userId: number): Person | undefined {
-  return db
-    .select({ id: users.id, name: users.name })
-    .from(users)
-    .where(eq(users.id, userId))
-    .get();
-}
 
 function countSeats(db: Db, purchaseId: number) {
   const total = db

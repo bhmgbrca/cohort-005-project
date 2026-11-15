@@ -1,20 +1,14 @@
 import { eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "~/db/schema";
-import {
-  comments,
-  courses,
-  lessons,
-  modules,
-  UserRole,
-  users,
-} from "~/db/schema";
+import { comments, courses, lessons, modules } from "~/db/schema";
 import {
   commentUrl,
   MAX_COMMENT_LENGTH,
   MIN_COMMENT_LENGTH,
 } from "~/lib/comments";
-import type { Notification, Person } from "~/lib/notifier.server";
+import type { Notification } from "~/lib/notifier.server";
+import { getPerson, isPlatformAdmin } from "~/lib/people.server";
 
 // ─── Comments ───
 // Posting Questions and Replies under a lesson. See GLOSSARY.md, "Questions".
@@ -60,18 +54,6 @@ function getCourseForLesson(db: Db, lessonId: number) {
     .get();
 }
 
-function getUser(db: Db, userId: number) {
-  return db
-    .select({ id: users.id, name: users.name, role: users.role })
-    .from(users)
-    .where(eq(users.id, userId))
-    .get();
-}
-
-function toPerson(user: { id: number; name: string }): Person {
-  return { id: user.id, name: user.name };
-}
-
 type Course = NonNullable<ReturnType<typeof getCourseForLesson>>;
 
 /**
@@ -86,20 +68,20 @@ function replyNotification(
 ): Notification | null {
   if (reply.userId === question.userId) return null;
 
-  const asker = getUser(db, question.userId);
-  const author = getUser(db, reply.userId);
+  const asker = getPerson(db, question.userId);
+  const author = getPerson(db, reply.userId);
   if (!asker || !author) return null;
 
   return {
     kind: "reply-to-question",
-    recipients: [toPerson(asker)],
-    actor: toPerson(author),
+    recipients: [asker],
+    actor: author,
     url: commentUrl(course.courseSlug, reply.lessonId, reply.id),
     questionId: question.id,
     replyId: reply.id,
     lessonTitle: course.lessonTitle,
     answered:
-      author.id === course.instructorId || author.role === UserRole.Admin,
+      author.id === course.instructorId || isPlatformAdmin(db, author.id),
   };
 }
 
@@ -114,14 +96,14 @@ function newQuestionNotification(
 ): Notification | null {
   if (question.userId === course.instructorId) return null;
 
-  const instructor = getUser(db, course.instructorId);
-  const asker = getUser(db, question.userId);
+  const instructor = getPerson(db, course.instructorId);
+  const asker = getPerson(db, question.userId);
   if (!instructor || !asker) return null;
 
   return {
     kind: "new-question",
-    recipients: [toPerson(instructor)],
-    actor: toPerson(asker),
+    recipients: [instructor],
+    actor: asker,
     url: commentUrl(course.courseSlug, question.lessonId, question.id),
     questionId: question.id,
     lessonTitle: course.lessonTitle,
