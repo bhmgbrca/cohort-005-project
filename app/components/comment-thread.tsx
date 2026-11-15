@@ -7,7 +7,7 @@ import { Card, CardContent } from "~/components/ui/card";
 import { Textarea } from "~/components/ui/textarea";
 import { UserAvatar } from "~/components/user-avatar";
 import { cn, formatRelativeTime } from "~/lib/utils";
-import { MAX_COMMENT_LENGTH } from "~/lib/comments";
+import { MAX_COMMENT_LENGTH, commentAnchorId } from "~/lib/comments";
 
 // Bodies arrive pre-rendered from the server (renderComment), because comments
 // are untrusted markdown and the sanitising renderer is server-only.
@@ -28,14 +28,6 @@ export type RenderedComment = {
   };
   replies: RenderedComment[];
 };
-
-/**
- * The element id for a Question or Reply, so `#comment-<id>` links (e.g. from
- * a Notification) land on it.
- */
-export function commentAnchorId(commentId: number) {
-  return `comment-${commentId}`;
-}
 
 /**
  * Scrolls to the `#comment-<id>` in the URL. The browser does this on a full
