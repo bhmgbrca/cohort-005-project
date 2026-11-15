@@ -7,6 +7,7 @@ import { courses, purchases } from "~/db/schema";
 import { eq } from "drizzle-orm";
 import { parseFormData, parseParams } from "~/lib/validation";
 import { raiseRefundRequest } from "~/lib/refunds.server";
+import { purchasePagePath } from "~/lib/refund-rules";
 import { sendEmail } from "~/lib/mailer.server";
 import { notify } from "~/lib/notifier.server";
 
@@ -77,5 +78,5 @@ export async function action({ params, request }: Route.ActionArgs) {
   await notify(result.notification);
   await sendEmail(result.email);
 
-  return redirect(result.kind === "team_licence" ? "/team" : "/settings");
+  return redirect(purchasePagePath(result.kind));
 }

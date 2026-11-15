@@ -10,6 +10,11 @@ export const REFUND_COMPLETION_LIMIT = 0.5;
 // Purchase that granted Seats, and every Team Licence grants at least one.
 export type PurchaseKind = "individual_purchase" | "team_licence";
 
+/** Where the buyer manages a Purchase and its Refund Requests. */
+export function purchasePagePath(kind: PurchaseKind): "/team" | "/settings" {
+  return kind === "team_licence" ? "/team" : "/settings";
+}
+
 export type RuleBreak =
   | "window_closed"
   | "watched_too_much"

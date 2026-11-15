@@ -195,12 +195,11 @@ function triggeringRecord(notification: Notification): string {
     case "reply-to-question":
       return `reply ${notification.replyId} on question ${notification.questionId}`;
     case "new-refund-request":
-      return `refund request ${notification.refundRequestId}`;
-    case "new-question":
-      return `question ${notification.questionId}`;
     case "refund-approved":
     case "refund-declined":
       return `refund request ${notification.refundRequestId}`;
+    case "new-question":
+      return `question ${notification.questionId}`;
     case "seat-claimed":
       return `seat ${notification.seatId}`;
   }

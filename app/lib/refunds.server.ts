@@ -22,6 +22,7 @@ import {
   REFUND_COMPLETION_LIMIT,
   REFUND_WATCH_LIMIT_SECONDS,
   REFUND_WINDOW_DAYS,
+  purchasePagePath,
   type PurchaseKind,
   type RuleBreak,
 } from "~/lib/refund-rules";
@@ -794,7 +795,7 @@ function buildDecisionNotification(
   const common = {
     recipients: [buyer],
     actor: platformAdmin,
-    url: purchaseKind === "team_licence" ? "/team" : "/settings",
+    url: purchasePagePath(purchaseKind),
     refundRequestId,
     courseTitle: course.title,
     amountPaid: purchase.amountPaid,
