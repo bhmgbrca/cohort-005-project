@@ -203,6 +203,14 @@ describe("notify", () => {
     expect(transport.sent).toEqual([notification]);
   });
 
+  it("does nothing when there is no Notification", async () => {
+    const transport = recordingTransport();
+
+    await notify(null, transport);
+
+    expect(transport.sent).toEqual([]);
+  });
+
   it("logs a failed send with its kind, recipients, triggering record and error, without throwing", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const failing = {

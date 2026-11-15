@@ -222,12 +222,14 @@ function describeError(error: unknown): string {
 /**
  * Sends a Notification. Never throws: one attempt, at most 3 seconds, and on failure or timeout it logs
  * the kind, recipient ids, triggering record and error, then returns, so the
- * person acting never notices.
+ * person acting never notices. Does nothing for `null`, so a route can pass a
+ * domain function's result straight in.
  */
 export async function notify(
-  notification: Notification,
+  notification: Notification | null,
   transport: NotificationTransport = defaultTransport()
 ): Promise<void> {
+  if (!notification) return;
   try {
     await withTimeout(transport.send(notification), SEND_TIMEOUT_MS);
   } catch (error) {

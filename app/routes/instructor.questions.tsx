@@ -184,7 +184,7 @@ export async function action({ request }: Route.ActionArgs) {
     throw error;
   }
 
-  if (result.notification) await notify(result.notification);
+  await notify(result.notification);
 
   return { ok: true };
 }

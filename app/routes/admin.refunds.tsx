@@ -129,7 +129,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // Before the email: `notify` never throws, so an email failure can't stop it.
-  if (result.notification) await notify(result.notification);
+  await notify(result.notification);
   await sendEmail(result.email);
 
   return {

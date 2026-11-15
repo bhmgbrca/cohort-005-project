@@ -862,7 +862,7 @@ export async function action({ params, request }: Route.ActionArgs) {
           parsed.data.parentId ?? null,
           parsed.data.body
         );
-        if (notification) await notify(notification);
+        await notify(notification);
         return { ok: true };
       }
 
