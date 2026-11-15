@@ -144,3 +144,10 @@
   width: 50%;
   animation: loading-bar-shimmer 1.2s ease-in-out infinite;
 }
+/* Knock's Notification feed popover opens to the right of the sidebar (w-56).
+   Shrink it on narrow or short windows so it isn't cut off. */
+.rnf-notification-feed-popover {
+  --rnf-notification-feed-popover-max-w: min(400px, calc(100vw - 15rem));
+  --rnf-notification-feed-popover-min-w: min(280px, calc(100vw - 15rem));
+  --rnf-notification-feed-popover-height: min(400px, calc(100vh - 1rem));
+}

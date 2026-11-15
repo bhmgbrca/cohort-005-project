@@ -1,7 +1,5 @@
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { alias } from "drizzle-orm/sqlite-core";
-import * as schema from "~/db/schema";
 import {
   coupons,
   courses,
@@ -17,12 +15,21 @@ import {
   RefundStatus,
 } from "~/db/schema";
 import { formatPrice } from "~/lib/utils";
+import type { Db, Queryable } from "~/db";
+import type { Notification } from "~/lib/notifier.server";
+import { getCourseTitle } from "~/lib/courses.server";
+import { getPerson, getPlatformAdminsExcept } from "~/lib/people.server";
 import {
   REFUND_COMPLETION_LIMIT,
   REFUND_WATCH_LIMIT_SECONDS,
   REFUND_WINDOW_DAYS,
   type RuleBreak,
 } from "~/lib/refund-rules";
+import {
+  ADMIN_REFUNDS_PATH,
+  purchasePagePath,
+  type PurchaseKind,
+} from "~/lib/purchases";
 
 // ─── Refunds ───
 // Everything about Refund Requests: whether a Purchase may be refunded, raising
@@ -31,10 +38,6 @@ import {
 //
 // Every function takes the database first, so tests can hand in an in-memory
 // one. Uses positional parameters (project convention).
-
-export type Db = BetterSQLite3Database<typeof schema>;
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
-type Queryable = Db | Tx;
 
 type Purchase = typeof purchases.$inferSelect;
 type Seat = typeof coupons.$inferSelect;
@@ -69,7 +72,8 @@ function getPurchase(db: Queryable, purchaseId: number) {
   return db.select().from(purchases).where(eq(purchases.id, purchaseId)).get();
 }
 
-function getSeats(db: Queryable, purchaseId: number): Seat[] {
+/** Every Seat on a Purchase; none for an Individual Purchase. */
+export function getSeats(db: Queryable, purchaseId: number): Seat[] {
   return db
     .select()
     .from(coupons)
@@ -77,14 +81,12 @@ function getSeats(db: Queryable, purchaseId: number): Seat[] {
     .all();
 }
 
-function isClaimed(seat: Seat) {
+/** Whether a Student has claimed this Seat: a Claimed Seat. */
+export function isClaimed(seat: Seat) {
   return seat.redeemedAt !== null;
 }
 
-// There is no column saying which kind a Purchase is: a Team Licence is the
-// Purchase that granted Seats, and every Team Licence grants at least one.
-export type PurchaseKind = "individual_purchase" | "team_licence";
-
+/** A Team Licence is the Purchase that granted Seats (see PURCHASE_KINDS). */
 function kindOf(seats: Seat[]): PurchaseKind {
   return seats.length > 0 ? "team_licence" : "individual_purchase";
 }
@@ -351,7 +353,13 @@ export function getRefundOffer(
 export type Email = { to: string; subject: string; body: string };
 
 export type RaiseResult =
-  | { ok: true; refundRequestId: number; kind: PurchaseKind; email: Email }
+  | {
+      ok: true;
+      refundRequestId: number;
+      kind: PurchaseKind;
+      email: Email;
+      notification: Notification | null;
+    }
   | Failure;
 
 export function raiseRefundRequest(
@@ -387,10 +395,18 @@ export function raiseRefundRequest(
     .returning()
     .get();
 
+  const kind = kindOf(getSeats(db, purchase.id));
+
   return {
     ok: true,
     refundRequestId: refundRequest.id,
-    kind: kindOf(getSeats(db, purchase.id)),
+    kind,
+    notification: buildNewRefundRequestNotification(
+      db,
+      refundRequest.id,
+      purchase,
+      kind
+    ),
     email: {
       to: buyer.email,
       subject: `Refund requested — ${course.title}`,
@@ -405,6 +421,35 @@ export function raiseRefundRequest(
         "— The Cadence team",
       ].join("\n"),
     },
+  };
+}
+
+/**
+ * New Refund Request (C), to every Platform Admin but the buyer. `null` when
+ * there is no other Platform Admin, or the buyer or course can't be found.
+ */
+function buildNewRefundRequestNotification(
+  db: Queryable,
+  refundRequestId: number,
+  purchase: Purchase,
+  purchaseKind: PurchaseKind
+): Notification | null {
+  const platformAdmins = getPlatformAdminsExcept(db, purchase.userId);
+  if (platformAdmins.length === 0) return null;
+
+  const buyer = getPerson(db, purchase.userId);
+  const courseTitle = getCourseTitle(db, purchase.courseId);
+  if (!buyer || !courseTitle) return null;
+
+  return {
+    kind: "new-refund-request",
+    recipients: platformAdmins,
+    actor: buyer,
+    url: ADMIN_REFUNDS_PATH,
+    refundRequestId,
+    courseTitle,
+    amountPaid: purchase.amountPaid,
+    purchaseKind,
   };
 }
 
@@ -568,7 +613,9 @@ export function listTeamLicences(db: Queryable, buyerId: number, now: Date) {
 
 // ─── Deciding a Refund Request ───
 
-export type DecisionResult = { ok: true; email: Email } | Failure;
+export type DecisionResult =
+  | { ok: true; email: Email; notification: Notification | null }
+  | Failure;
 
 function findOpenRefundRequest(
   tx: Queryable,
@@ -680,6 +727,13 @@ export function approveRefundRequest(
     return {
       ok: true,
       email: buildDecisionEmail(tx, purchase, RefundStatus.Approved, note),
+      notification: buildDecisionNotification(
+        tx,
+        refundRequestId,
+        purchase,
+        platformAdminId,
+        { decision: RefundStatus.Approved, note }
+      ),
     };
   });
 }
@@ -728,8 +782,53 @@ export function declineRefundRequest(
         RefundStatus.Declined,
         trimmedNote
       ),
+      notification: buildDecisionNotification(
+        tx,
+        refundRequestId,
+        found.purchase,
+        platformAdminId,
+        { decision: RefundStatus.Declined, note: trimmedNote }
+      ),
     };
   });
+}
+
+/**
+ * Refund Request approved (A) or declined (B), to the buyer from the deciding
+ * Platform Admin. `null` when the Platform Admin decided their own Refund
+ * Request, or when the buyer, Platform Admin or course can't be found.
+ */
+function buildDecisionNotification(
+  db: Queryable,
+  refundRequestId: number,
+  purchase: Purchase,
+  platformAdminId: number,
+  outcome:
+    | { decision: RefundStatus.Approved; note: string | null }
+    | { decision: RefundStatus.Declined; note: string }
+): Notification | null {
+  if (purchase.userId === platformAdminId) return null;
+
+  const buyer = getPerson(db, purchase.userId);
+  const platformAdmin = getPerson(db, platformAdminId);
+  const courseTitle = getCourseTitle(db, purchase.courseId);
+  if (!buyer || !platformAdmin || !courseTitle) return null;
+
+  const purchaseKind = kindOf(getSeats(db, purchase.id));
+
+  const common = {
+    recipients: [buyer],
+    actor: platformAdmin,
+    url: purchasePagePath(purchaseKind),
+    refundRequestId,
+    courseTitle,
+    amountPaid: purchase.amountPaid,
+    purchaseKind,
+  };
+
+  return outcome.decision === RefundStatus.Approved
+    ? { ...common, kind: "refund-approved", note: outcome.note }
+    : { ...common, kind: "refund-declined", note: outcome.note };
 }
 
 /** The email the buyer gets once their Refund Request is decided. */
@@ -744,13 +843,7 @@ function buildDecisionEmail(
     .from(users)
     .where(eq(users.id, purchase.userId))
     .get();
-  const course = db
-    .select()
-    .from(courses)
-    .where(eq(courses.id, purchase.courseId))
-    .get();
-
-  const courseTitle = course?.title ?? "your course";
+  const courseTitle = getCourseTitle(db, purchase.courseId) ?? "your course";
   const noteLines = note ? ["", note] : [];
 
   const middle =
