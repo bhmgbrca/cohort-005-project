@@ -9,6 +9,7 @@
 
 import Knock from "@knocklabs/node";
 import { isUnderVitest } from "~/lib/env.server";
+import { formatPrice } from "~/lib/utils";
 
 /** Someone who sends or receives a Notification. Only id and name leave Cadence. */
 export type Person = { id: number; name: string };
@@ -31,6 +32,16 @@ export type ReplyToQuestionNotification = NotificationBase & {
   answered: boolean;
 };
 
+/** C: a buyer raised a Refund Request. Goes to every Platform Admin but the buyer. */
+export type NewRefundRequestNotification = NotificationBase & {
+  kind: "new-refund-request";
+  refundRequestId: number;
+  courseTitle: string;
+  /** What the buyer paid, in cents. */
+  amount: number;
+  purchaseKind: "individual_purchase" | "team_licence";
+};
+
 /** F: someone asked a Question on one of the recipient's lessons. */
 export type NewQuestionNotification = NotificationBase & {
   kind: "new-question";
@@ -42,6 +53,7 @@ export type NewQuestionNotification = NotificationBase & {
 /** One variant per launch Notification, distinguished by `kind`. */
 export type Notification =
   | ReplyToQuestionNotification
+  | NewRefundRequestNotification
   | NewQuestionNotification;
 
 /** The markdown body shown in the feed. */
@@ -50,6 +62,13 @@ export function notificationText(notification: Notification): string {
     case "reply-to-question": {
       const verb = notification.answered ? "answered" : "replied to";
       return `${notification.actor.name} **${verb}** your Question on *${notification.lessonTitle}*.`;
+    }
+    case "new-refund-request": {
+      const purchaseKind =
+        notification.purchaseKind === "team_licence"
+          ? "Team Licence"
+          : "Individual Purchase";
+      return `**New Refund Request** from ${notification.actor.name} for *${notification.courseTitle}*: ${formatPrice(notification.amount)}, ${purchaseKind}.`;
     }
     case "new-question":
       return `${notification.actor.name} **asked a Question** on *${notification.lessonTitle}* in *${notification.courseTitle}*.`;
@@ -132,6 +151,8 @@ function triggeringRecord(notification: Notification): string {
   switch (notification.kind) {
     case "reply-to-question":
       return `reply ${notification.replyId} on question ${notification.questionId}`;
+    case "new-refund-request":
+      return `refund request ${notification.refundRequestId}`;
     case "new-question":
       return `question ${notification.questionId}`;
   }

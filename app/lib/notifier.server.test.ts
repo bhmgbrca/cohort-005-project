@@ -34,6 +34,35 @@ describe("notificationText", () => {
   });
 });
 
+function newRefundRequest(
+  purchaseKind: "individual_purchase" | "team_licence"
+): Notification {
+  return {
+    kind: "new-refund-request",
+    recipients: [{ id: 3, name: "Pat Admin" }],
+    actor: { id: 1, name: "Liam Student" },
+    url: "/admin/refunds",
+    refundRequestId: 21,
+    courseTitle: "Intro to TypeScript",
+    amount: 7900,
+    purchaseKind,
+  };
+}
+
+describe("notificationText for New Refund Request", () => {
+  it("names the buyer, course, amount and Individual Purchase", () => {
+    expect(notificationText(newRefundRequest("individual_purchase"))).toBe(
+      "**New Refund Request** from Liam Student for *Intro to TypeScript*: $79.00, Individual Purchase."
+    );
+  });
+
+  it("says Team Licence for a Team Licence", () => {
+    expect(notificationText(newRefundRequest("team_licence"))).toBe(
+      "**New Refund Request** from Liam Student for *Intro to TypeScript*: $79.00, Team Licence."
+    );
+  });
+});
+
 describe("notificationText for New Question", () => {
   it("names the asker, lesson and course", () => {
     expect(
