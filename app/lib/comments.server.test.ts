@@ -227,4 +227,64 @@ describe("createComment", () => {
       expect(notification).toBeNull();
     });
   });
+
+  describe("New Question Notification", () => {
+    it("tells the course's Instructor someone asked a Question, linking to it", () => {
+      const { comment: question, notification } = createComment(
+        db,
+        base.user.id,
+        lessonId,
+        null,
+        "How do I start?"
+      );
+
+      expect(notification).toEqual({
+        kind: "new-question",
+        recipients: [{ id: base.instructor.id, name: "Test Instructor" }],
+        actor: { id: base.user.id, name: "Test User" },
+        url: `/courses/test-course/lessons/${lessonId}#comment-${question.id}`,
+        questionId: question.id,
+        lessonTitle: "Lesson 1",
+        courseTitle: "Test Course",
+      });
+    });
+
+    it("doesn't notify anyone of the Instructor's own Question", () => {
+      const { notification } = createComment(
+        db,
+        base.instructor.id,
+        lessonId,
+        null,
+        "Any questions so far?"
+      );
+
+      expect(notification).toBeNull();
+    });
+
+    it("never sends it to Platform Admins, even when one asks", () => {
+      const admin = db
+        .insert(schema.users)
+        .values({
+          name: "Ops",
+          email: "ops@example.com",
+          role: schema.UserRole.Admin,
+        })
+        .returning()
+        .get();
+
+      const { notification } = createComment(
+        db,
+        admin.id,
+        lessonId,
+        null,
+        "Is this lesson up to date?"
+      );
+
+      expect(notification).toMatchObject({
+        kind: "new-question",
+        recipients: [{ id: base.instructor.id, name: "Test Instructor" }],
+        actor: { id: admin.id, name: "Ops" },
+      });
+    });
+  });
 });

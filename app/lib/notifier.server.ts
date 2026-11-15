@@ -31,8 +31,18 @@ export type ReplyToQuestionNotification = NotificationBase & {
   answered: boolean;
 };
 
+/** F: someone asked a Question on one of the recipient's lessons. */
+export type NewQuestionNotification = NotificationBase & {
+  kind: "new-question";
+  questionId: number;
+  lessonTitle: string;
+  courseTitle: string;
+};
+
 /** One variant per launch Notification, distinguished by `kind`. */
-export type Notification = ReplyToQuestionNotification;
+export type Notification =
+  | ReplyToQuestionNotification
+  | NewQuestionNotification;
 
 /** The markdown body shown in the feed. */
 export function notificationText(notification: Notification): string {
@@ -41,6 +51,8 @@ export function notificationText(notification: Notification): string {
       const verb = notification.answered ? "answered" : "replied to";
       return `${notification.actor.name} **${verb}** your Question on *${notification.lessonTitle}*.`;
     }
+    case "new-question":
+      return `${notification.actor.name} **asked a Question** on *${notification.lessonTitle}* in *${notification.courseTitle}*.`;
   }
 }
 
@@ -120,6 +132,8 @@ function triggeringRecord(notification: Notification): string {
   switch (notification.kind) {
     case "reply-to-question":
       return `reply ${notification.replyId} on question ${notification.questionId}`;
+    case "new-question":
+      return `question ${notification.questionId}`;
   }
 }
 
