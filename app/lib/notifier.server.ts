@@ -9,6 +9,7 @@
 
 import Knock from "@knocklabs/node";
 import { isUnderVitest } from "~/lib/env.server";
+import { formatPrice } from "~/lib/utils";
 
 /** Someone who sends or receives a Notification. Only id and name leave Cadence. */
 export type Person = { id: number; name: string };
@@ -31,8 +32,40 @@ export type ReplyToQuestionNotification = NotificationBase & {
   answered: boolean;
 };
 
+/** A: a Platform Admin approved the recipient's Refund Request. */
+export type RefundApprovedNotification = NotificationBase & {
+  kind: "refund-approved";
+  refundRequestId: number;
+  courseTitle: string;
+  /** In cents, the full amount the buyer paid. */
+  amountPaid: number;
+  teamLicence: boolean;
+  /** The admin's note in full; the feed shortens it. */
+  note: string | null;
+};
+
+/** B: a Platform Admin declined the recipient's Refund Request. */
+export type RefundDeclinedNotification = NotificationBase & {
+  kind: "refund-declined";
+  refundRequestId: number;
+  courseTitle: string;
+  teamLicence: boolean;
+  /** The admin's note in full; the feed shortens it. Always present. */
+  note: string;
+};
+
 /** One variant per launch Notification, distinguished by `kind`. */
-export type Notification = ReplyToQuestionNotification;
+export type Notification =
+  | ReplyToQuestionNotification
+  | RefundApprovedNotification
+  | RefundDeclinedNotification;
+
+/** Admin notes longer than this are cut in the feed; the email has them in full. */
+const NOTE_LIMIT = 200;
+
+function shortenNote(note: string): string {
+  return note.length > NOTE_LIMIT ? `${note.slice(0, NOTE_LIMIT)}…` : note;
+}
 
 /** The markdown body shown in the feed. */
 export function notificationText(notification: Notification): string {
@@ -41,6 +74,17 @@ export function notificationText(notification: Notification): string {
       const verb = notification.answered ? "answered" : "replied to";
       return `${notification.actor.name} **${verb}** your Question on *${notification.lessonTitle}*.`;
     }
+    case "refund-approved": {
+      const ended = notification.teamLicence
+        ? "Your Unclaimed Seats can no longer be claimed."
+        : "Your Enrollment has ended.";
+      const text = `**Refund approved** for *${notification.courseTitle}*. ${formatPrice(notification.amountPaid)} is on its way back to you. ${ended}`;
+      return notification.note
+        ? `${text}\n"${shortenNote(notification.note)}"`
+        : text;
+    }
+    case "refund-declined":
+      return `**Refund declined** for *${notification.courseTitle}*: "${shortenNote(notification.note)}" You still have everything you bought.`;
   }
 }
 
@@ -120,6 +164,9 @@ function triggeringRecord(notification: Notification): string {
   switch (notification.kind) {
     case "reply-to-question":
       return `reply ${notification.replyId} on question ${notification.questionId}`;
+    case "refund-approved":
+    case "refund-declined":
+      return `refund request ${notification.refundRequestId}`;
   }
 }
 
