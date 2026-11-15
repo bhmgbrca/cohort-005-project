@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import type { Db } from "~/db";
+import type { Db, Queryable } from "~/db";
 import { coupons, enrollments, purchases } from "~/db/schema";
 import { getCourseTitle } from "~/lib/courses.server";
 import type { Notification } from "~/lib/notifier.server";
@@ -61,6 +61,66 @@ function seatClaimedNotification(
   };
 }
 
+export function getSeatByCode(db: Queryable, code: string): Seat | undefined {
+  return db.select().from(coupons).where(eq(coupons.code, code)).get();
+}
+
+function isEnrolled(db: Queryable, userId: number, courseId: number) {
+  const enrollment = db
+    .select({ id: enrollments.id })
+    .from(enrollments)
+    .where(
+      and(eq(enrollments.userId, userId), eq(enrollments.courseId, courseId))
+    )
+    .get();
+  return enrollment !== undefined;
+}
+
+function getPurchase(db: Queryable, purchaseId: number) {
+  return db.select().from(purchases).where(eq(purchases.id, purchaseId)).get();
+}
+
+/** Why a Student can't claim a Seat. */
+export type ClaimBlock =
+  | "claimed"
+  | "enrolled"
+  | "on_hold"
+  | "refunded"
+  | "wrong_country";
+
+export const CLAIM_BLOCK_ERRORS: Record<ClaimBlock, string> = {
+  claimed: "This Seat has already been claimed",
+  enrolled: "You are already enrolled in this course",
+  on_hold: SEAT_ON_HOLD,
+  refunded: SEAT_REFUNDED,
+  wrong_country:
+    "This Seat can only be claimed from the country the Team Licence was bought in",
+};
+
+/**
+ * The first reason this Student can't claim this Seat from `userCountry`, or
+ * `null` when they can. A Student already enrolled is told so before anything
+ * about the Seat itself, since they have nothing to claim.
+ */
+export function findClaimBlock(
+  db: Queryable,
+  seat: Seat,
+  userId: number,
+  userCountry: string
+): ClaimBlock | null {
+  const availability = getSeatAvailability(db, seat);
+  if (availability === "claimed") return "claimed";
+  if (isEnrolled(db, userId, seat.courseId)) return "enrolled";
+  if (availability === "on_hold") return "on_hold";
+  if (availability === "refunded") return "refunded";
+
+  const purchase = getPurchase(db, seat.purchaseId);
+  if (purchase?.country && purchase.country !== userCountry) {
+    return "wrong_country";
+  }
+  return null;
+}
+
 /**
  * Claims the Seat with this code for a Student and enrolls them. Returns a
  * user-facing error when the Seat can't be claimed.
@@ -74,50 +134,14 @@ export function claimSeat(
   userId: number,
   userCountry: string
 ): ClaimSeatResult {
-  const seat = db.select().from(coupons).where(eq(coupons.code, code)).get();
+  const seat = getSeatByCode(db, code);
   if (!seat) {
     return { ok: false, error: "Seat not found" };
   }
 
-  if (seat.redeemedByUserId !== null) {
-    return { ok: false, error: "This Seat has already been claimed" };
-  }
-
-  const availability = getSeatAvailability(db, seat);
-  if (availability === "on_hold") {
-    return { ok: false, error: SEAT_ON_HOLD };
-  }
-  if (availability === "refunded") {
-    return { ok: false, error: SEAT_REFUNDED };
-  }
-
-  const existingEnrollment = db
-    .select()
-    .from(enrollments)
-    .where(
-      and(
-        eq(enrollments.userId, userId),
-        eq(enrollments.courseId, seat.courseId)
-      )
-    )
-    .get();
-
-  if (existingEnrollment) {
-    return { ok: false, error: "You are already enrolled in this course" };
-  }
-
-  const purchase = db
-    .select()
-    .from(purchases)
-    .where(eq(purchases.id, seat.purchaseId))
-    .get();
-
-  if (purchase?.country && purchase.country !== userCountry) {
-    return {
-      ok: false,
-      error:
-        "This Seat can only be claimed from the country the Team Licence was bought in",
-    };
+  const block = findClaimBlock(db, seat, userId, userCountry);
+  if (block) {
+    return { ok: false, error: CLAIM_BLOCK_ERRORS[block] };
   }
 
   db.update(coupons)
@@ -134,6 +158,7 @@ export function claimSeat(
     .returning()
     .get();
 
+  const purchase = getPurchase(db, seat.purchaseId);
   const notification = purchase
     ? seatClaimedNotification(db, seat, purchase.userId, userId)
     : null;

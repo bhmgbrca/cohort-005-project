@@ -6,35 +6,23 @@ import type { Route } from "./+types/redeem.$code";
 import { getCurrentUserId } from "~/lib/session";
 import { resolveCountry } from "~/lib/country.server";
 import { parseParams, parseFormData } from "~/lib/validation";
-import { getSeatAvailability } from "~/lib/refunds.server";
-import { claimSeat, SEAT_ON_HOLD, SEAT_REFUNDED } from "~/lib/seats.server";
+import {
+  claimSeat,
+  CLAIM_BLOCK_ERRORS,
+  findClaimBlock,
+  getSeatByCode,
+} from "~/lib/seats.server";
 import { notify } from "~/lib/notifier.server";
 import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Ticket, AlertCircle, CheckCircle2, Globe } from "lucide-react";
 import { data } from "react-router";
 import { db } from "~/db";
-import { purchases, coupons, courses, enrollments } from "~/db/schema";
-import { eq, and } from "drizzle-orm";
+import { courses } from "~/db/schema";
+import { eq } from "drizzle-orm";
 
 function getCourseById(id: number) {
   return db.select().from(courses).where(eq(courses.id, id)).get();
-}
-
-function getSeatByCode(code: string) {
-  return db.select().from(coupons).where(eq(coupons.code, code)).get();
-}
-
-function isUserEnrolled(userId: number, courseId: number) {
-  const existing = db
-    .select()
-    .from(enrollments)
-    .where(
-      and(eq(enrollments.userId, userId), eq(enrollments.courseId, courseId))
-    )
-    .get();
-
-  return !!existing;
 }
 
 const redeemParamsSchema = z.object({
@@ -56,7 +44,7 @@ export function meta({ loaderData }: Route.MetaArgs) {
 export async function loader({ params, request }: Route.LoaderArgs) {
   const { code } = parseParams(params, redeemParamsSchema);
 
-  const seat = getSeatByCode(code);
+  const seat = getSeatByCode(db, code);
   if (!seat) {
     throw data("Seat not found.", { status: 404 });
   }
@@ -73,36 +61,19 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     throw data("Course not found.", { status: 404 });
   }
 
-  const alreadyClaimed = seat.redeemedByUserId !== null;
-  const alreadyEnrolled = isUserEnrolled(currentUserId, seat.courseId);
-  const availability = getSeatAvailability(db, seat);
+  const userCountry = await resolveCountry(request);
+  const block = findClaimBlock(db, seat, currentUserId, userCountry ?? "");
   const unavailableReason =
-    availability === "on_hold"
-      ? SEAT_ON_HOLD
-      : availability === "refunded"
-        ? SEAT_REFUNDED
-        : null;
-
-  // Check country mismatch upfront so we can show a clear message
-  let countryMismatch = false;
-  if (!alreadyClaimed && !alreadyEnrolled) {
-    const userCountry = await resolveCountry(request);
-    const purchase = db
-      .select()
-      .from(purchases)
-      .where(eq(purchases.id, seat.purchaseId))
-      .get();
-    if (purchase?.country && purchase.country !== (userCountry ?? "")) {
-      countryMismatch = true;
-    }
-  }
+    block === "on_hold" || block === "refunded"
+      ? CLAIM_BLOCK_ERRORS[block]
+      : null;
 
   return {
     course: { id: course.id, title: course.title, slug: course.slug },
     code,
-    alreadyClaimed,
-    alreadyEnrolled,
-    countryMismatch,
+    alreadyClaimed: block === "claimed",
+    alreadyEnrolled: block === "enrolled",
+    countryMismatch: block === "wrong_country",
     unavailableReason,
   };
 }

@@ -4,7 +4,13 @@ import { createTestDb, seedBaseData } from "~/test/setup";
 import * as schema from "~/db/schema";
 import { RefundStatus, UserRole } from "~/db/schema";
 import { listTeamLicences } from "./refunds.server";
-import { claimSeat, SEAT_ON_HOLD, SEAT_REFUNDED } from "./seats.server";
+import {
+  claimSeat,
+  findClaimBlock,
+  getSeatByCode,
+  SEAT_ON_HOLD,
+  SEAT_REFUNDED,
+} from "./seats.server";
 
 type TestDb = ReturnType<typeof createTestDb>;
 
@@ -150,6 +156,35 @@ describe("claimSeat", () => {
     expect(claimSeat(db, seats[0].code, base.user.id, "BR")).toMatchObject({
       ok: true,
     });
+  });
+});
+
+describe("findClaimBlock", () => {
+  it("is null for an Unclaimed Seat the Student can claim", () => {
+    const { seats } = buySeats(teamAdmin.id, 1, "BR");
+    const seat = getSeatByCode(db, seats[0].code);
+    if (!seat) throw new Error("no seat");
+
+    expect(findClaimBlock(db, seat, base.user.id, "BR")).toBeNull();
+    expect(findClaimBlock(db, seat, base.user.id, "US")).toBe("wrong_country");
+  });
+
+  it("says an enrolled Student is enrolled even while the Seat is on hold", () => {
+    const { purchase, seats } = buySeats(teamAdmin.id, 1);
+    db.insert(schema.enrollments)
+      .values({ userId: base.user.id, courseId: base.course.id })
+      .run();
+    db.insert(schema.refunds)
+      .values({
+        purchaseId: purchase.id,
+        status: RefundStatus.Open,
+        reason: "Changed plans",
+      })
+      .run();
+    const seat = getSeatByCode(db, seats[0].code);
+    if (!seat) throw new Error("no seat");
+
+    expect(findClaimBlock(db, seat, base.user.id, "")).toBe("enrolled");
   });
 });
 
