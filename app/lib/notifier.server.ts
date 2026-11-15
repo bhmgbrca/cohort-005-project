@@ -143,19 +143,6 @@ export interface NotificationTransport {
   send(notification: Notification): Promise<void>;
 }
 
-/** Keeps every Notification in memory. Used by tests. */
-export function recordingTransport(): NotificationTransport & {
-  sent: Notification[];
-} {
-  const sent: Notification[] = [];
-  return {
-    sent,
-    async send(notification) {
-      sent.push(notification);
-    },
-  };
-}
-
 /** Prints "would send …" instead of sending. Used without Knock keys and in tests. */
 export function logOnlyTransport(): NotificationTransport {
   return {

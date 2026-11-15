@@ -5,10 +5,10 @@ import {
   getFeedConfig,
   notificationText,
   notify,
-  recordingTransport,
   type Notification,
 } from "./notifier.server";
 import type { PurchaseKind } from "./refunds.server";
+import { recordingTransport } from "~/test/recording-transport";
 
 function replyToQuestion(answered: boolean): Notification {
   return {
