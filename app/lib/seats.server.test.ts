@@ -23,7 +23,11 @@ function createStudent(name: string) {
     .get();
 }
 
-function buySeats(buyerId: number, seats: number, country: string | null = null) {
+function buySeats(
+  buyerId: number,
+  seats: number,
+  country: string | null = null
+) {
   const team = db.insert(schema.teams).values({}).returning().get();
   const purchase = db
     .insert(schema.purchases)
@@ -145,5 +149,46 @@ describe("claimSeat", () => {
     expect(claimSeat(db, seats[0].code, base.user.id, "BR")).toMatchObject({
       ok: true,
     });
+  });
+});
+
+describe("claimSeat: Seat claimed Notification", () => {
+  it("tells the Team Admin who bought the Team Licence, with the counts at that moment", () => {
+    const { seats } = buySeats(teamAdmin.id, 3);
+    const first = createStudent("First Student");
+    claimSeat(db, seats[0].code, first.id, "");
+
+    const result = claimSeat(db, seats[1].code, base.user.id, "");
+
+    expect(result.ok && result.notification).toEqual({
+      kind: "seat-claimed",
+      recipients: [{ id: teamAdmin.id, name: "Tess Admin" }],
+      actor: { id: base.user.id, name: "Test User" },
+      url: "/team",
+      seatId: seats[1].id,
+      courseTitle: "Test Course",
+      claimed: 2,
+      total: 3,
+    });
+  });
+
+  it("counts only the Seats on this Team Licence", () => {
+    buySeats(teamAdmin.id, 4);
+    const { seats } = buySeats(teamAdmin.id, 2);
+
+    const result = claimSeat(db, seats[0].code, base.user.id, "");
+
+    expect(result.ok && result.notification).toMatchObject({
+      claimed: 1,
+      total: 2,
+    });
+  });
+
+  it("returns no Notification when the Team Admin claims their own Seat", () => {
+    const { seats } = buySeats(teamAdmin.id, 2);
+
+    const result = claimSeat(db, seats[0].code, teamAdmin.id, "");
+
+    expect(result).toMatchObject({ ok: true, notification: null });
   });
 });

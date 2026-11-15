@@ -31,8 +31,21 @@ export type ReplyToQuestionNotification = NotificationBase & {
   answered: boolean;
 };
 
+/** D: a Student claimed a Seat on the recipient's Team Licence. */
+export type SeatClaimedNotification = NotificationBase & {
+  kind: "seat-claimed";
+  seatId: number;
+  courseTitle: string;
+  /** Claimed Seats on the Team Licence, counting this one. */
+  claimed: number;
+  /** All Seats on the Team Licence. */
+  total: number;
+};
+
 /** One variant per launch Notification, distinguished by `kind`. */
-export type Notification = ReplyToQuestionNotification;
+export type Notification =
+  | ReplyToQuestionNotification
+  | SeatClaimedNotification;
 
 /** The markdown body shown in the feed. */
 export function notificationText(notification: Notification): string {
@@ -41,6 +54,8 @@ export function notificationText(notification: Notification): string {
       const verb = notification.answered ? "answered" : "replied to";
       return `${notification.actor.name} **${verb}** your Question on *${notification.lessonTitle}*.`;
     }
+    case "seat-claimed":
+      return `${notification.actor.name} **claimed a Seat** on *${notification.courseTitle}*. ${notification.claimed} of ${notification.total} Seats claimed.`;
   }
 }
 
@@ -120,6 +135,8 @@ function triggeringRecord(notification: Notification): string {
   switch (notification.kind) {
     case "reply-to-question":
       return `reply ${notification.replyId} on question ${notification.questionId}`;
+    case "seat-claimed":
+      return `seat ${notification.seatId}`;
   }
 }
 
