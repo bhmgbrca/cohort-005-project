@@ -9,10 +9,20 @@
 
 import Knock, { signUserToken } from "@knocklabs/node";
 import { isUnderVitest } from "~/lib/env.server";
+import type { PurchaseKind } from "~/lib/refunds.server";
 import { formatPrice } from "~/lib/utils";
 
 /** Someone who sends or receives a Notification. Only id and name leave Cadence. */
 export type Person = { id: number; name: string };
+
+/** The Purchase a Refund Request is about, the same in every refund Notification. */
+type RefundRequestFacts = {
+  refundRequestId: number;
+  courseTitle: string;
+  /** What the buyer paid, in cents. A Refund is always the full amount. */
+  amountPaid: number;
+  purchaseKind: PurchaseKind;
+};
 
 type NotificationBase = {
   recipients: Person[];
@@ -33,36 +43,26 @@ export type ReplyToQuestionNotification = NotificationBase & {
 };
 
 /** C: a buyer raised a Refund Request. Goes to every Platform Admin but the buyer. */
-export type NewRefundRequestNotification = NotificationBase & {
-  kind: "new-refund-request";
-  refundRequestId: number;
-  courseTitle: string;
-  /** What the buyer paid, in cents. */
-  amount: number;
-  purchaseKind: "individual_purchase" | "team_licence";
-};
+export type NewRefundRequestNotification = NotificationBase &
+  RefundRequestFacts & {
+    kind: "new-refund-request";
+  };
 
 /** A: a Platform Admin approved the recipient's Refund Request. */
-export type RefundApprovedNotification = NotificationBase & {
-  kind: "refund-approved";
-  refundRequestId: number;
-  courseTitle: string;
-  /** In cents, the full amount the buyer paid. */
-  amountPaid: number;
-  teamLicence: boolean;
-  /** The admin's note in full; the feed shortens it. */
-  note: string | null;
-};
+export type RefundApprovedNotification = NotificationBase &
+  RefundRequestFacts & {
+    kind: "refund-approved";
+    /** The admin's note in full; the feed shortens it. */
+    note: string | null;
+  };
 
 /** B: a Platform Admin declined the recipient's Refund Request. */
-export type RefundDeclinedNotification = NotificationBase & {
-  kind: "refund-declined";
-  refundRequestId: number;
-  courseTitle: string;
-  teamLicence: boolean;
-  /** The admin's note in full; the feed shortens it. Always present. */
-  note: string;
-};
+export type RefundDeclinedNotification = NotificationBase &
+  RefundRequestFacts & {
+    kind: "refund-declined";
+    /** The admin's note in full; the feed shortens it. Always present. */
+    note: string;
+  };
 
 /** F: someone asked a Question on one of the recipient's lessons. */
 export type NewQuestionNotification = NotificationBase & {
@@ -111,12 +111,13 @@ export function notificationText(notification: Notification): string {
         notification.purchaseKind === "team_licence"
           ? "Team Licence"
           : "Individual Purchase";
-      return `**New Refund Request** from ${notification.actor.name} for *${notification.courseTitle}*: ${formatPrice(notification.amount)}, ${purchaseKind}.`;
+      return `**New Refund Request** from ${notification.actor.name} for *${notification.courseTitle}*: ${formatPrice(notification.amountPaid)}, ${purchaseKind}.`;
     }
     case "new-question":
       return `${notification.actor.name} **asked a Question** on *${notification.lessonTitle}* in *${notification.courseTitle}*.`;
     case "refund-approved": {
-      const ended = notification.teamLicence
+      const ended =
+        notification.purchaseKind === "team_licence"
         ? "Your Unclaimed Seats can no longer be claimed."
         : "Your Enrollment has ended.";
       const text = `**Refund approved** for *${notification.courseTitle}*. ${formatPrice(notification.amountPaid)} is on its way back to you. ${ended}`;

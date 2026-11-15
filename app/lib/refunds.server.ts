@@ -422,7 +422,7 @@ export function raiseRefundRequest(
             url: "/admin/refunds",
             refundRequestId: refundRequest.id,
             courseTitle: course.title,
-            amount: purchase.amountPaid,
+            amountPaid: purchase.amountPaid,
             purchaseKind: kind,
           },
     email: {
@@ -810,22 +810,22 @@ function buildDecisionNotification(
     .from(courses)
     .where(eq(courses.id, purchase.courseId))
     .get();
-  const teamLicence = kindOf(getSeats(db, purchase.id)) === "team_licence";
+  const purchaseKind = kindOf(getSeats(db, purchase.id));
 
   const common = {
     recipients: [person(purchase.userId)],
     actor: person(platformAdminId),
-    url: teamLicence ? "/team" : "/settings",
+    url: purchaseKind === "team_licence" ? "/team" : "/settings",
     refundRequestId,
     courseTitle: course?.title ?? "your course",
-    teamLicence,
+    amountPaid: purchase.amountPaid,
+    purchaseKind,
   };
 
   return decision.decision === RefundStatus.Approved
     ? {
         ...common,
         kind: "refund-approved",
-        amountPaid: purchase.amountPaid,
         note: decision.note,
       }
     : { ...common, kind: "refund-declined", note: decision.note };
