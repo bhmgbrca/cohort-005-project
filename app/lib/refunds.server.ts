@@ -803,7 +803,7 @@ function buildDecisionNotification(
   refundRequestId: number,
   purchase: Purchase,
   platformAdminId: number,
-  decision:
+  outcome:
     | { decision: RefundStatus.Approved; note: string | null }
     | { decision: RefundStatus.Declined; note: string }
 ): Notification | null {
@@ -826,13 +826,9 @@ function buildDecisionNotification(
     purchaseKind,
   };
 
-  return decision.decision === RefundStatus.Approved
-    ? {
-        ...common,
-        kind: "refund-approved",
-        note: decision.note,
-      }
-    : { ...common, kind: "refund-declined", note: decision.note };
+  return outcome.decision === RefundStatus.Approved
+    ? { ...common, kind: "refund-approved", note: outcome.note }
+    : { ...common, kind: "refund-declined", note: outcome.note };
 }
 
 /** The email the buyer gets once their Refund Request is decided. */
