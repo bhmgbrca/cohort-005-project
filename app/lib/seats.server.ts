@@ -20,9 +20,9 @@ type Enrollment = typeof enrollments.$inferSelect;
 type Seat = typeof coupons.$inferSelect;
 
 export const SEAT_ON_HOLD =
-  "This seat can't be claimed right now. Ask the person who shared it with you.";
+  "This Seat can't be claimed right now. Ask the person who shared it with you.";
 export const SEAT_REFUNDED =
-  "This seat is no longer available. Ask the person who shared it with you.";
+  "This Seat is no longer available. Ask the person who shared it with you.";
 
 export type ClaimSeatResult =
   | { ok: true; enrollment: Enrollment; notification: Notification | null }
