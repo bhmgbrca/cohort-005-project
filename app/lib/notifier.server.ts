@@ -42,6 +42,28 @@ export type NewRefundRequestNotification = NotificationBase & {
   purchaseKind: "individual_purchase" | "team_licence";
 };
 
+/** A: a Platform Admin approved the recipient's Refund Request. */
+export type RefundApprovedNotification = NotificationBase & {
+  kind: "refund-approved";
+  refundRequestId: number;
+  courseTitle: string;
+  /** In cents, the full amount the buyer paid. */
+  amountPaid: number;
+  teamLicence: boolean;
+  /** The admin's note in full; the feed shortens it. */
+  note: string | null;
+};
+
+/** B: a Platform Admin declined the recipient's Refund Request. */
+export type RefundDeclinedNotification = NotificationBase & {
+  kind: "refund-declined";
+  refundRequestId: number;
+  courseTitle: string;
+  teamLicence: boolean;
+  /** The admin's note in full; the feed shortens it. Always present. */
+  note: string;
+};
+
 /** F: someone asked a Question on one of the recipient's lessons. */
 export type NewQuestionNotification = NotificationBase & {
   kind: "new-question";
@@ -54,7 +76,16 @@ export type NewQuestionNotification = NotificationBase & {
 export type Notification =
   | ReplyToQuestionNotification
   | NewRefundRequestNotification
-  | NewQuestionNotification;
+  | NewQuestionNotification
+  | RefundApprovedNotification
+  | RefundDeclinedNotification;
+
+/** Admin notes longer than this are cut in the feed; the email has them in full. */
+const NOTE_LIMIT = 200;
+
+function shortenNote(note: string): string {
+  return note.length > NOTE_LIMIT ? `${note.slice(0, NOTE_LIMIT)}…` : note;
+}
 
 /** The markdown body shown in the feed. */
 export function notificationText(notification: Notification): string {
@@ -72,6 +103,17 @@ export function notificationText(notification: Notification): string {
     }
     case "new-question":
       return `${notification.actor.name} **asked a Question** on *${notification.lessonTitle}* in *${notification.courseTitle}*.`;
+    case "refund-approved": {
+      const ended = notification.teamLicence
+        ? "Your Unclaimed Seats can no longer be claimed."
+        : "Your Enrollment has ended.";
+      const text = `**Refund approved** for *${notification.courseTitle}*. ${formatPrice(notification.amountPaid)} is on its way back to you. ${ended}`;
+      return notification.note
+        ? `${text}\n"${shortenNote(notification.note)}"`
+        : text;
+    }
+    case "refund-declined":
+      return `**Refund declined** for *${notification.courseTitle}*: "${shortenNote(notification.note)}" You still have everything you bought.`;
   }
 }
 
@@ -155,6 +197,9 @@ function triggeringRecord(notification: Notification): string {
       return `refund request ${notification.refundRequestId}`;
     case "new-question":
       return `question ${notification.questionId}`;
+    case "refund-approved":
+    case "refund-declined":
+      return `refund request ${notification.refundRequestId}`;
   }
 }
 
