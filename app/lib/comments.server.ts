@@ -87,7 +87,8 @@ function replyNotification(
 
 /**
  * New Question (F), for the course's Instructor. `null` when the Instructor
- * asked it. Platform Admins never get F.
+ * asked it, or when the Instructor is a Platform Admin: Platform Admins never
+ * get F.
  */
 function newQuestionNotification(
   db: Db,
@@ -95,6 +96,7 @@ function newQuestionNotification(
   question: Comment
 ): Notification | null {
   if (question.userId === course.instructorId) return null;
+  if (isPlatformAdmin(db, course.instructorId)) return null;
 
   const instructor = getPerson(db, course.instructorId);
   const asker = getPerson(db, question.userId);
