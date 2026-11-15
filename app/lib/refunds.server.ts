@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import {
   coupons,
@@ -13,12 +13,11 @@ import {
   videoWatchEvents,
   LessonProgressStatus,
   RefundStatus,
-  UserRole,
 } from "~/db/schema";
 import { formatPrice } from "~/lib/utils";
 import type { Db, Queryable } from "~/db";
 import type { Notification } from "~/lib/notifier.server";
-import { getPerson, type Person } from "~/lib/people.server";
+import { getPerson, getPlatformAdminsExcept } from "~/lib/people.server";
 import {
   REFUND_COMPLETION_LIMIT,
   REFUND_WATCH_LIMIT_SECONDS,
@@ -354,16 +353,6 @@ export type RaiseResult =
       notification: Notification | null;
     }
   | Failure;
-
-/** Everyone who is a Platform Admin right now, except `exceptUserId`. */
-function getPlatformAdminsExcept(db: Queryable, exceptUserId: number): Person[] {
-  return db
-    .select({ id: users.id, name: users.name })
-    .from(users)
-    .where(and(eq(users.role, UserRole.Admin), ne(users.id, exceptUserId)))
-    .orderBy(asc(users.id))
-    .all();
-}
 
 export function raiseRefundRequest(
   db: Db,
