@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { alias } from "drizzle-orm/sqlite-core";
 import * as schema from "~/db/schema";
@@ -15,8 +15,10 @@ import {
   videoWatchEvents,
   LessonProgressStatus,
   RefundStatus,
+  UserRole,
 } from "~/db/schema";
 import { formatPrice } from "~/lib/utils";
+import type { Notification, Person } from "~/lib/notifier.server";
 import {
   REFUND_COMPLETION_LIMIT,
   REFUND_WATCH_LIMIT_SECONDS,
@@ -351,8 +353,24 @@ export function getRefundOffer(
 export type Email = { to: string; subject: string; body: string };
 
 export type RaiseResult =
-  | { ok: true; refundRequestId: number; kind: PurchaseKind; email: Email }
+  | {
+      ok: true;
+      refundRequestId: number;
+      kind: PurchaseKind;
+      email: Email;
+      notification: Notification | null;
+    }
   | Failure;
+
+/** Everyone who is a Platform Admin right now, except `exceptUserId`. */
+function getPlatformAdminsExcept(db: Queryable, exceptUserId: number): Person[] {
+  return db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .where(and(eq(users.role, UserRole.Admin), ne(users.id, exceptUserId)))
+    .orderBy(asc(users.id))
+    .all();
+}
 
 export function raiseRefundRequest(
   db: Db,
@@ -387,10 +405,26 @@ export function raiseRefundRequest(
     .returning()
     .get();
 
+  const kind = kindOf(getSeats(db, purchase.id));
+  const platformAdmins = getPlatformAdminsExcept(db, buyer.id);
+
   return {
     ok: true,
     refundRequestId: refundRequest.id,
-    kind: kindOf(getSeats(db, purchase.id)),
+    kind,
+    notification:
+      platformAdmins.length === 0
+        ? null
+        : {
+            kind: "new-refund-request",
+            recipients: platformAdmins,
+            actor: { id: buyer.id, name: buyer.name },
+            url: "/admin/refunds",
+            refundRequestId: refundRequest.id,
+            courseTitle: course.title,
+            amount: purchase.amountPaid,
+            purchaseKind: kind,
+          },
     email: {
       to: buyer.email,
       subject: `Refund requested — ${course.title}`,

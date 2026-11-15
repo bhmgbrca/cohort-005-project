@@ -49,6 +49,7 @@ function getCourseForLesson(db: Db, lessonId: number) {
     .select({
       courseId: courses.id,
       courseSlug: courses.slug,
+      courseTitle: courses.title,
       instructorId: courses.instructorId,
       lessonTitle: lessons.title,
     })
@@ -103,6 +104,32 @@ function replyNotification(
 }
 
 /**
+ * New Question (F), for the course's Instructor. `null` when the Instructor
+ * asked it. Platform Admins never get F.
+ */
+function newQuestionNotification(
+  db: Db,
+  course: Course,
+  question: Comment
+): Notification | null {
+  if (question.userId === course.instructorId) return null;
+
+  const instructor = getUser(db, course.instructorId);
+  const asker = getUser(db, question.userId);
+  if (!instructor || !asker) return null;
+
+  return {
+    kind: "new-question",
+    recipients: [toPerson(instructor)],
+    actor: toPerson(asker),
+    url: commentUrl(course.courseSlug, question.lessonId, question.id),
+    questionId: question.id,
+    lessonTitle: course.lessonTitle,
+    courseTitle: course.courseTitle,
+  };
+}
+
+/**
  * Posts a Question (`parentId` null) or a Reply to a Question on a lesson.
  * Throws an Error with a user-facing message when the body or parent is
  * invalid; nobody can reply to a Reply.
@@ -146,7 +173,7 @@ export function createComment(
 
   const notification = parent
     ? replyNotification(db, course, parent, comment)
-    : null;
+    : newQuestionNotification(db, course, comment);
 
   return { comment, notification };
 }

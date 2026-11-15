@@ -237,6 +237,91 @@ describe("raising a Refund Request", () => {
   });
 });
 
+describe("the New Refund Request Notification", () => {
+  function addPlatformAdmin(name: string) {
+    return db
+      .insert(schema.users)
+      .values({
+        name,
+        email: `${name.toLowerCase()}@example.com`,
+        role: UserRole.Admin,
+      })
+      .returning()
+      .get();
+  }
+
+  it("goes to every Platform Admin, from the buyer, with the course, amount and kind", () => {
+    const otherAdmin = addPlatformAdmin("Quinn");
+    const purchase = buyForSelf(base.user.id, 3, 4900);
+
+    const result = raiseRefundRequest(db, purchase.id, base.user.id, "Nope.", NOW);
+
+    if (!result.ok) throw new Error(result.error);
+    expect(result.notification).toEqual({
+      kind: "new-refund-request",
+      recipients: [
+        { id: platformAdmin.id, name: "Pat Admin" },
+        { id: otherAdmin.id, name: "Quinn" },
+      ],
+      actor: { id: base.user.id, name: base.user.name },
+      url: "/admin/refunds",
+      refundRequestId: result.refundRequestId,
+      courseTitle: base.course.title,
+      amount: 4900,
+      purchaseKind: "individual_purchase",
+    });
+  });
+
+  it("says Team Licence for a Team Licence", () => {
+    const teamAdmin = addLearner("Priya");
+    const { purchase } = buySeats(teamAdmin.id, 2);
+
+    const result = raiseRefundRequest(db, purchase.id, teamAdmin.id, "Nope.", NOW);
+
+    if (!result.ok) throw new Error(result.error);
+    expect(result.notification).toMatchObject({
+      purchaseKind: "team_licence",
+      amount: 15800,
+    });
+  });
+
+  it("leaves out a Platform Admin who raised it, but not the other admins", () => {
+    const otherAdmin = addPlatformAdmin("Quinn");
+    const purchase = buyForSelf(platformAdmin.id);
+
+    const result = raiseRefundRequest(db, purchase.id, platformAdmin.id, "Nope.", NOW);
+
+    if (!result.ok) throw new Error(result.error);
+    expect(result.notification?.recipients).toEqual([
+      { id: otherAdmin.id, name: "Quinn" },
+    ]);
+  });
+
+  it("is null when no other Platform Admin exists", () => {
+    const purchase = buyForSelf(platformAdmin.id);
+
+    const result = raiseRefundRequest(db, purchase.id, platformAdmin.id, "Nope.", NOW);
+
+    if (!result.ok) throw new Error(result.error);
+    expect(result.notification).toBeNull();
+  });
+
+  it("includes a Platform Admin added after an earlier Refund Request", () => {
+    const first = buyForSelf(base.user.id);
+    const second = buyForSelf(addLearner("Ben").id);
+    raise(first.id, base.user.id);
+    const newAdmin = addPlatformAdmin("Quinn");
+
+    const result = raiseRefundRequest(db, second.id, second.userId, "Nope.", NOW);
+
+    if (!result.ok) throw new Error(result.error);
+    expect(result.notification?.recipients.map((r) => r.id)).toEqual([
+      platformAdmin.id,
+      newAdmin.id,
+    ]);
+  });
+});
+
 describe("the refund offer on the course page", () => {
   it("offers the newest Individual Purchase, not a newer Team Licence", () => {
     const individual = buyForSelf(base.user.id, 3);

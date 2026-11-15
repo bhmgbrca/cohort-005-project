@@ -34,6 +34,53 @@ describe("notificationText", () => {
   });
 });
 
+function newRefundRequest(
+  purchaseKind: "individual_purchase" | "team_licence"
+): Notification {
+  return {
+    kind: "new-refund-request",
+    recipients: [{ id: 3, name: "Pat Admin" }],
+    actor: { id: 1, name: "Liam Student" },
+    url: "/admin/refunds",
+    refundRequestId: 21,
+    courseTitle: "Intro to TypeScript",
+    amount: 7900,
+    purchaseKind,
+  };
+}
+
+describe("notificationText for New Refund Request", () => {
+  it("names the buyer, course, amount and Individual Purchase", () => {
+    expect(notificationText(newRefundRequest("individual_purchase"))).toBe(
+      "**New Refund Request** from Liam Student for *Intro to TypeScript*: $79.00, Individual Purchase."
+    );
+  });
+
+  it("says Team Licence for a Team Licence", () => {
+    expect(notificationText(newRefundRequest("team_licence"))).toBe(
+      "**New Refund Request** from Liam Student for *Intro to TypeScript*: $79.00, Team Licence."
+    );
+  });
+});
+
+describe("notificationText for New Question", () => {
+  it("names the asker, lesson and course", () => {
+    expect(
+      notificationText({
+        kind: "new-question",
+        recipients: [{ id: 2, name: "Ada Instructor" }],
+        actor: { id: 1, name: "Liam Student" },
+        url: "/courses/intro/lessons/7#comment-11",
+        questionId: 11,
+        lessonTitle: "Getting Started",
+        courseTitle: "Intro to Cadence",
+      })
+    ).toBe(
+      "Liam Student **asked a Question** on *Getting Started* in *Intro to Cadence*."
+    );
+  });
+});
+
 describe("notificationText for Seat claimed", () => {
   it("names the Student and course with the Seat counts at that moment", () => {
     const seatClaimed: Notification = {
