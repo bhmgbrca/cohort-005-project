@@ -20,10 +20,12 @@ import {
   TOKEN_REFRESH_URL,
 } from "~/lib/notification-feed";
 
+type ColorMode = "light" | "dark";
+
 interface NotificationFeedProps {
   /** `null` when there's no user or no Knock configuration: no bell at all. */
   config: FeedConfig | null;
-  colorMode: "light" | "dark";
+  colorMode: ColorMode;
 }
 
 export function NotificationFeed({ config, colorMode }: NotificationFeedProps) {
@@ -57,7 +59,7 @@ function KnockFeed({
   colorMode,
 }: {
   config: FeedConfig;
-  colorMode: "light" | "dark";
+  colorMode: ColorMode;
 }) {
   const navigate = useNavigate();
   const buttonRef = useRef<HTMLButtonElement>(null);
