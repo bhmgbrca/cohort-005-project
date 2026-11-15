@@ -7,7 +7,7 @@ import {
   notify,
   type Notification,
 } from "./notifier.server";
-import type { PurchaseKind } from "./refunds.server";
+import type { PurchaseKind } from "./refund-rules";
 import { recordingTransport } from "~/test/recording-transport";
 
 function replyToQuestion(answered: boolean): Notification {

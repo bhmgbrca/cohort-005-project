@@ -9,11 +9,9 @@
 
 import Knock, { signUserToken } from "@knocklabs/node";
 import { isUnderVitest } from "~/lib/env.server";
-import type { PurchaseKind } from "~/lib/refunds.server";
+import type { Person } from "~/lib/people.server";
+import type { PurchaseKind } from "~/lib/refund-rules";
 import { formatPrice } from "~/lib/utils";
-
-/** Someone who sends or receives a Notification. Only id and name leave Cadence. */
-export type Person = { id: number; name: string };
 
 /** The Purchase a Refund Request is about, the same in every refund Notification. */
 type RefundRequestFacts = {

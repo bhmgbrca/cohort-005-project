@@ -1,7 +1,5 @@
 import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { alias } from "drizzle-orm/sqlite-core";
-import * as schema from "~/db/schema";
 import {
   coupons,
   courses,
@@ -18,12 +16,14 @@ import {
   UserRole,
 } from "~/db/schema";
 import { formatPrice } from "~/lib/utils";
-import type { Notification, Person } from "~/lib/notifier.server";
-import { getPerson } from "~/lib/people.server";
+import type { Db, Queryable } from "~/db";
+import type { Notification } from "~/lib/notifier.server";
+import { getPerson, type Person } from "~/lib/people.server";
 import {
   REFUND_COMPLETION_LIMIT,
   REFUND_WATCH_LIMIT_SECONDS,
   REFUND_WINDOW_DAYS,
+  type PurchaseKind,
   type RuleBreak,
 } from "~/lib/refund-rules";
 
@@ -34,10 +34,6 @@ import {
 //
 // Every function takes the database first, so tests can hand in an in-memory
 // one. Uses positional parameters (project convention).
-
-export type Db = BetterSQLite3Database<typeof schema>;
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
-type Queryable = Db | Tx;
 
 type Purchase = typeof purchases.$inferSelect;
 type Seat = typeof coupons.$inferSelect;
@@ -83,10 +79,6 @@ function getSeats(db: Queryable, purchaseId: number): Seat[] {
 function isClaimed(seat: Seat) {
   return seat.redeemedAt !== null;
 }
-
-// There is no column saying which kind a Purchase is: a Team Licence is the
-// Purchase that granted Seats, and every Team Licence grants at least one.
-export type PurchaseKind = "individual_purchase" | "team_licence";
 
 function kindOf(seats: Seat[]): PurchaseKind {
   return seats.length > 0 ? "team_licence" : "individual_purchase";

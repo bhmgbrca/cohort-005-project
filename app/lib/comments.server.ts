@@ -1,6 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import * as schema from "~/db/schema";
+import type { Db } from "~/db";
 import { comments, courses, lessons, modules } from "~/db/schema";
 import {
   commentUrl,
@@ -17,7 +16,6 @@ import { getPerson, isPlatformAdmin } from "~/lib/people.server";
 // one. Uses positional parameters (project convention). Access checks (who may
 // post on this course) stay in the route actions, which know the session.
 
-type Db = BetterSQLite3Database<typeof schema>;
 type Comment = typeof comments.$inferSelect;
 
 /** Trims a Question or Reply body and enforces the length limits. Throws if invalid. */

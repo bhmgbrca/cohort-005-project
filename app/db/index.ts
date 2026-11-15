@@ -1,5 +1,8 @@
 import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import {
+  drizzle,
+  type BetterSQLite3Database,
+} from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 
 // The connection is opened lazily, on first use. Opening it at module scope
@@ -7,6 +10,12 @@ import * as schema from "./schema";
 // the client bundle when a route imported a service purely for its loader —
 // dragging better-sqlite3 into the browser. Keep this file side-effect free.
 let connection: Database.Database | undefined;
+
+/** The database, or an in-memory one in tests. Domain functions take it first. */
+export type Db = BetterSQLite3Database<typeof schema>;
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+/** The database or a transaction on it, for reads that work in either. */
+export type Queryable = Db | Tx;
 
 export function getSqlite() {
   if (!connection) {

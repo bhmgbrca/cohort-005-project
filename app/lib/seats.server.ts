@@ -1,6 +1,5 @@
 import { and, count, eq, isNotNull } from "drizzle-orm";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import * as schema from "~/db/schema";
+import type { Db } from "~/db";
 import { coupons, courses, enrollments, purchases } from "~/db/schema";
 import type { Notification } from "~/lib/notifier.server";
 import { getPerson } from "~/lib/people.server";
@@ -12,7 +11,6 @@ import { getSeatAvailability } from "~/lib/refunds.server";
 // Every function takes the database first, so tests can hand in an in-memory
 // one. Uses positional parameters (project convention).
 
-type Db = BetterSQLite3Database<typeof schema>;
 type Enrollment = typeof enrollments.$inferSelect;
 type Seat = typeof coupons.$inferSelect;
 

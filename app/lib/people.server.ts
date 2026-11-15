@@ -1,16 +1,13 @@
 import { eq } from "drizzle-orm";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import * as schema from "~/db/schema";
+import type { Queryable } from "~/db";
 import { UserRole, users } from "~/db/schema";
-import type { Person } from "~/lib/notifier.server";
 
 // ─── People ───
 // Looking up the people a Notification is from or for. Takes the database (or
 // a transaction) first, so tests can hand in an in-memory one.
 
-type Db = BetterSQLite3Database<typeof schema>;
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
-type Queryable = Db | Tx;
+/** Someone who sends or receives a Notification. Only id and name leave Cadence. */
+export type Person = { id: number; name: string };
 
 /** The user as a Notification Person (id and name only), if they exist. */
 export function getPerson(db: Queryable, userId: number): Person | undefined {
