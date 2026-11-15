@@ -167,6 +167,25 @@ describe("notificationText for New Question", () => {
   });
 });
 
+describe("notificationText for Seat claimed", () => {
+  it("names the Student and course with the Seat counts at that moment", () => {
+    const seatClaimed: Notification = {
+      kind: "seat-claimed",
+      recipients: [{ id: 3, name: "Tess Admin" }],
+      actor: { id: 1, name: "Liam Student" },
+      url: "/team",
+      seatId: 21,
+      courseTitle: "Intro to TypeScript",
+      claimed: 3,
+      total: 5,
+    };
+
+    expect(notificationText(seatClaimed)).toBe(
+      "Liam Student **claimed a Seat** on *Intro to TypeScript*. 3 of 5 Seats claimed."
+    );
+  });
+});
+
 describe("notify", () => {
   afterEach(() => {
     vi.restoreAllMocks();

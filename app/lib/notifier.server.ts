@@ -72,13 +72,25 @@ export type NewQuestionNotification = NotificationBase & {
   courseTitle: string;
 };
 
+/** D: a Student claimed a Seat on the recipient's Team Licence. */
+export type SeatClaimedNotification = NotificationBase & {
+  kind: "seat-claimed";
+  seatId: number;
+  courseTitle: string;
+  /** Claimed Seats on the Team Licence, counting this one. */
+  claimed: number;
+  /** All Seats on the Team Licence. */
+  total: number;
+};
+
 /** One variant per launch Notification, distinguished by `kind`. */
 export type Notification =
   | ReplyToQuestionNotification
   | NewRefundRequestNotification
   | NewQuestionNotification
   | RefundApprovedNotification
-  | RefundDeclinedNotification;
+  | RefundDeclinedNotification
+  | SeatClaimedNotification;
 
 /** Admin notes longer than this are cut in the feed; the email has them in full. */
 const NOTE_LIMIT = 200;
@@ -114,6 +126,8 @@ export function notificationText(notification: Notification): string {
     }
     case "refund-declined":
       return `**Refund declined** for *${notification.courseTitle}*: "${shortenNote(notification.note)}" You still have everything you bought.`;
+    case "seat-claimed":
+      return `${notification.actor.name} **claimed a Seat** on *${notification.courseTitle}*. ${notification.claimed} of ${notification.total} Seats claimed.`;
   }
 }
 
@@ -200,6 +214,8 @@ function triggeringRecord(notification: Notification): string {
     case "refund-approved":
     case "refund-declined":
       return `refund request ${notification.refundRequestId}`;
+    case "seat-claimed":
+      return `seat ${notification.seatId}`;
   }
 }
 
