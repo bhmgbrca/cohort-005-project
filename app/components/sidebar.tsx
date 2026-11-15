@@ -1,3 +1,7 @@
+import {
+  SidebarHeaderSlot,
+  SidebarNavSlot,
+} from "~/components/notification-feed-prototype"; // PROTOTYPE (#9)
 import { NavLink, Form } from "react-router";
 import { useState, useEffect } from "react";
 import { cn } from "~/lib/utils";
@@ -140,6 +144,9 @@ export function Sidebar({
         <NavLink to="/" className="text-lg font-bold tracking-tight">
           Cadence
         </NavLink>
+        <div className="ml-auto">
+          <SidebarHeaderSlot />
+        </div>
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
@@ -178,6 +185,7 @@ export function Sidebar({
             Team
           </NavLink>
         )}
+        <SidebarNavSlot />
       </nav>
 
       {recentCourses.length > 0 && (
