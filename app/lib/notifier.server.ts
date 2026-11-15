@@ -9,6 +9,7 @@
 
 import Knock, { signUserToken } from "@knocklabs/node";
 import { isUnderVitest } from "~/lib/env.server";
+import { formatPrice } from "~/lib/utils";
 
 /** Someone who sends or receives a Notification. Only id and name leave Cadence. */
 export type Person = { id: number; name: string };
@@ -31,8 +32,60 @@ export type ReplyToQuestionNotification = NotificationBase & {
   answered: boolean;
 };
 
+/** C: a buyer raised a Refund Request. Goes to every Platform Admin but the buyer. */
+export type NewRefundRequestNotification = NotificationBase & {
+  kind: "new-refund-request";
+  refundRequestId: number;
+  courseTitle: string;
+  /** What the buyer paid, in cents. */
+  amount: number;
+  purchaseKind: "individual_purchase" | "team_licence";
+};
+
+/** A: a Platform Admin approved the recipient's Refund Request. */
+export type RefundApprovedNotification = NotificationBase & {
+  kind: "refund-approved";
+  refundRequestId: number;
+  courseTitle: string;
+  /** In cents, the full amount the buyer paid. */
+  amountPaid: number;
+  teamLicence: boolean;
+  /** The admin's note in full; the feed shortens it. */
+  note: string | null;
+};
+
+/** B: a Platform Admin declined the recipient's Refund Request. */
+export type RefundDeclinedNotification = NotificationBase & {
+  kind: "refund-declined";
+  refundRequestId: number;
+  courseTitle: string;
+  teamLicence: boolean;
+  /** The admin's note in full; the feed shortens it. Always present. */
+  note: string;
+};
+
+/** F: someone asked a Question on one of the recipient's lessons. */
+export type NewQuestionNotification = NotificationBase & {
+  kind: "new-question";
+  questionId: number;
+  lessonTitle: string;
+  courseTitle: string;
+};
+
 /** One variant per launch Notification, distinguished by `kind`. */
-export type Notification = ReplyToQuestionNotification;
+export type Notification =
+  | ReplyToQuestionNotification
+  | NewRefundRequestNotification
+  | NewQuestionNotification
+  | RefundApprovedNotification
+  | RefundDeclinedNotification;
+
+/** Admin notes longer than this are cut in the feed; the email has them in full. */
+const NOTE_LIMIT = 200;
+
+function shortenNote(note: string): string {
+  return note.length > NOTE_LIMIT ? `${note.slice(0, NOTE_LIMIT)}…` : note;
+}
 
 /** The markdown body shown in the feed. */
 export function notificationText(notification: Notification): string {
@@ -41,6 +94,26 @@ export function notificationText(notification: Notification): string {
       const verb = notification.answered ? "answered" : "replied to";
       return `${notification.actor.name} **${verb}** your Question on *${notification.lessonTitle}*.`;
     }
+    case "new-refund-request": {
+      const purchaseKind =
+        notification.purchaseKind === "team_licence"
+          ? "Team Licence"
+          : "Individual Purchase";
+      return `**New Refund Request** from ${notification.actor.name} for *${notification.courseTitle}*: ${formatPrice(notification.amount)}, ${purchaseKind}.`;
+    }
+    case "new-question":
+      return `${notification.actor.name} **asked a Question** on *${notification.lessonTitle}* in *${notification.courseTitle}*.`;
+    case "refund-approved": {
+      const ended = notification.teamLicence
+        ? "Your Unclaimed Seats can no longer be claimed."
+        : "Your Enrollment has ended.";
+      const text = `**Refund approved** for *${notification.courseTitle}*. ${formatPrice(notification.amountPaid)} is on its way back to you. ${ended}`;
+      return notification.note
+        ? `${text}\n"${shortenNote(notification.note)}"`
+        : text;
+    }
+    case "refund-declined":
+      return `**Refund declined** for *${notification.courseTitle}*: "${shortenNote(notification.note)}" You still have everything you bought.`;
   }
 }
 
@@ -120,6 +193,13 @@ function triggeringRecord(notification: Notification): string {
   switch (notification.kind) {
     case "reply-to-question":
       return `reply ${notification.replyId} on question ${notification.questionId}`;
+    case "new-refund-request":
+      return `refund request ${notification.refundRequestId}`;
+    case "new-question":
+      return `question ${notification.questionId}`;
+    case "refund-approved":
+    case "refund-declined":
+      return `refund request ${notification.refundRequestId}`;
   }
 }
 
