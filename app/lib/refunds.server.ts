@@ -17,6 +17,7 @@ import {
 import { formatPrice } from "~/lib/utils";
 import type { Db, Queryable } from "~/db";
 import type { Notification } from "~/lib/notifier.server";
+import { getCourseTitle } from "~/lib/courses.server";
 import { getPerson, getPlatformAdminsExcept } from "~/lib/people.server";
 import {
   REFUND_COMPLETION_LIMIT,
@@ -783,12 +784,8 @@ function buildDecisionNotification(
 
   const buyer = getPerson(db, purchase.userId);
   const platformAdmin = getPerson(db, platformAdminId);
-  const course = db
-    .select({ title: courses.title })
-    .from(courses)
-    .where(eq(courses.id, purchase.courseId))
-    .get();
-  if (!buyer || !platformAdmin || !course) return null;
+  const courseTitle = getCourseTitle(db, purchase.courseId);
+  if (!buyer || !platformAdmin || !courseTitle) return null;
 
   const purchaseKind = kindOf(getSeats(db, purchase.id));
 
@@ -797,7 +794,7 @@ function buildDecisionNotification(
     actor: platformAdmin,
     url: purchasePagePath(purchaseKind),
     refundRequestId,
-    courseTitle: course.title,
+    courseTitle,
     amountPaid: purchase.amountPaid,
     purchaseKind,
   };
@@ -823,13 +820,7 @@ function buildDecisionEmail(
     .from(users)
     .where(eq(users.id, purchase.userId))
     .get();
-  const course = db
-    .select()
-    .from(courses)
-    .where(eq(courses.id, purchase.courseId))
-    .get();
-
-  const courseTitle = course?.title ?? "your course";
+  const courseTitle = getCourseTitle(db, purchase.courseId) ?? "your course";
   const noteLines = note ? ["", note] : [];
 
   const middle =
