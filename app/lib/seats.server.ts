@@ -98,11 +98,11 @@ export function claimSeat(
 ): ClaimSeatResult {
   const seat = db.select().from(coupons).where(eq(coupons.code, code)).get();
   if (!seat) {
-    return { ok: false, error: "Coupon not found" };
+    return { ok: false, error: "Seat not found" };
   }
 
   if (seat.redeemedByUserId !== null) {
-    return { ok: false, error: "Coupon has already been redeemed" };
+    return { ok: false, error: "This Seat has already been claimed" };
   }
 
   const availability = getSeatAvailability(db, seat);
@@ -138,7 +138,7 @@ export function claimSeat(
     return {
       ok: false,
       error:
-        "This coupon can only be redeemed from the same country as the purchaser",
+        "This Seat can only be claimed from the country the Team Licence was bought in",
     };
   }
 
