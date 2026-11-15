@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFetcher } from "react-router";
+import { useFetcher, useLocation } from "react-router";
 import { toast } from "sonner";
 import { MessageSquare, Pencil, Reply, Trash2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -28,6 +28,26 @@ export type RenderedComment = {
   };
   replies: RenderedComment[];
 };
+
+/**
+ * The element id for a Question or Reply, so `#comment-<id>` links (e.g. from
+ * a Notification) land on it.
+ */
+export function commentAnchorId(commentId: number) {
+  return `comment-${commentId}`;
+}
+
+/**
+ * Scrolls to the `#comment-<id>` in the URL. The browser does this on a full
+ * page load, but not reliably after a client-side navigation into the page.
+ */
+function useScrollToCommentAnchor() {
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash.startsWith("#comment-")) return;
+    document.getElementById(hash.slice(1))?.scrollIntoView();
+  }, [hash]);
+}
 
 function AuthorBadge({ label }: { label: string }) {
   return (
@@ -210,7 +230,7 @@ function CommentItem({
 
   if (comment.deleted) {
     return (
-      <div className="py-3">
+      <div id={commentAnchorId(comment.id)} className="scroll-mt-4 py-3">
         <p className="text-sm italic text-muted-foreground">
           This comment was deleted.
         </p>
@@ -225,7 +245,10 @@ function CommentItem({
   }
 
   return (
-    <div className={cn("py-3", isReply && "border-l pl-4")}>
+    <div
+      id={commentAnchorId(comment.id)}
+      className={cn("scroll-mt-4 py-3", isReply && "border-l pl-4")}
+    >
       <div className="flex items-start gap-3">
         <UserAvatar
           name={comment.author.name}
@@ -352,6 +375,8 @@ export function CommentThread({
   canPost: boolean;
   instructorName: string;
 }) {
+  useScrollToCommentAnchor();
+
   return (
     <Card className="mb-8">
       <CardContent className="p-6">
