@@ -4,7 +4,7 @@ import { cn } from "~/lib/utils";
 import { UserRole } from "~/db/schema";
 import { UserAvatar } from "~/components/user-avatar";
 import { NotificationFeed } from "~/components/notification-feed";
-import type { FeedConfig } from "~/lib/notifier.server";
+import type { FeedConfig } from "~/lib/notification-feed.server";
 import {
   BookOpen,
   ChartColumn,

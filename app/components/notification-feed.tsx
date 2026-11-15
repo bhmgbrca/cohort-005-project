@@ -2,7 +2,7 @@
 // The bell in the sidebar header and Knock's feed popover. See GLOSSARY.md,
 // "Notification", and ADR 0013. The browser reads the person's feed straight
 // from Knock with the public key and a user token signed by the server
-// (`getFeedConfig` in notifier.server.ts).
+// (`getFeedConfig` in notification-feed.server.ts).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -14,7 +14,7 @@ import {
   NotificationIconButton,
 } from "@knocklabs/react";
 import "@knocklabs/react/dist/index.css";
-import type { FeedConfig } from "~/lib/notifier.server";
+import type { FeedConfig } from "~/lib/notification-feed.server";
 import {
   parseRefreshedToken,
   TOKEN_REFRESH_URL,

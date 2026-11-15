@@ -1,7 +1,7 @@
 import { data } from "react-router";
 import type { Route } from "./+types/api.notifications.token";
 import { getCurrentUserId } from "~/lib/session";
-import { getFeedConfig } from "~/lib/notifier.server";
+import { getFeedConfig } from "~/lib/notification-feed.server";
 import type { RefreshedToken } from "~/lib/notification-feed";
 
 /**
