@@ -32,11 +32,13 @@ export function assertValidCommentBody(body: string) {
   return trimmed;
 }
 
-function getCommentById(db: Db, commentId: number) {
+/** A Question or Reply by id, if it exists. */
+export function getCommentById(db: Db, commentId: number) {
   return db.select().from(comments).where(eq(comments.id, commentId)).get();
 }
 
-function getCourseForLesson(db: Db, lessonId: number) {
+/** The course a lesson belongs to, with the lesson's title, if it exists. */
+export function getCourseForLesson(db: Db, lessonId: number) {
   return db
     .select({
       courseId: courses.id,
