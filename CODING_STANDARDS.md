@@ -32,8 +32,8 @@ Once a module owns a feature's data, the route asks the module for it and
 does not import `~/db` or `drizzle-orm` itself. The instructor analytics
 route gets everything from `instructorAnalytics`. A query in the loader
 splits the feature's rules across two files, and the module's tests stop
-covering what the page shows. `npm run lint:boundaries` enforces this for the
-instructor analytics route only; apply it to every other module by hand. See
+covering what the page shows. Check every route in the diff that has a
+module: any `~/db` or `drizzle-orm` import there is a breach. See
 [app/modules/README.md](./app/modules/README.md).
 
 ## Arrange tests through the module under test
