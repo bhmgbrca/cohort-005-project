@@ -1,7 +1,13 @@
 // Fails when a file is too big for an agent to read and edit in one go.
 // Tokens are estimated as bytes / 4, which is close enough for code.
 // Usage: node scripts/check-file-tokens.js <file>...
+//
+// A ratchet, not a wall. A file that was already over the limit at HEAD may
+// be committed as long as it does not grow. Otherwise every ticket that
+// touches one of the old oversized files would have to split it first, and
+// a one-line fix would arrive as a thousand-line refactor.
 
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 const MAX_TOKENS = 5000;
@@ -16,6 +22,21 @@ const IGNORED = [
 ];
 
 const isBinary = (contents) => contents.subarray(0, 8000).includes(0);
+const tokensOf = (contents) => Math.ceil(contents.length / BYTES_PER_TOKEN);
+
+// The file's size at HEAD, or 0 when it is new.
+function tokensAtHead(file) {
+  try {
+    return tokensOf(
+      execFileSync("git", ["show", `HEAD:${file}`], {
+        maxBuffer: 64 * 1024 * 1024,
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+    );
+  } catch {
+    return 0;
+  }
+}
 
 const oversized = process.argv
   .slice(2)
@@ -23,20 +44,24 @@ const oversized = process.argv
   .filter((file) => !IGNORED.some((pattern) => pattern.test(file)))
   .map((file) => ({ file, contents: readFileSync(file) }))
   .filter(({ contents }) => !isBinary(contents))
-  .map(({ file, contents }) => ({
-    file,
-    tokens: Math.ceil(contents.length / BYTES_PER_TOKEN),
-  }))
-  .filter(({ tokens }) => tokens > MAX_TOKENS);
+  .map(({ file, contents }) => ({ file, tokens: tokensOf(contents) }))
+  .filter(({ tokens }) => tokens > MAX_TOKENS)
+  .map((entry) => ({ ...entry, before: tokensAtHead(entry.file) }))
+  .filter(({ tokens, before }) => tokens > before);
 
 if (oversized.length > 0) {
   console.error(`These files are over ${MAX_TOKENS} tokens (bytes / 4):\n`);
-  for (const { file, tokens } of oversized) {
-    console.error(`  ${file}: ~${tokens} tokens`);
+  for (const { file, tokens, before } of oversized) {
+    const was = before > MAX_TOKENS ? ` (was ~${before} at HEAD)` : "";
+    console.error(`  ${file}: ~${tokens} tokens${was}`);
   }
   console.error(`
-Split each file before you commit. Do not delete code or squash it onto fewer
-lines to get under the limit.
+A file that was already over the limit at HEAD may stay over it, but it must
+not grow. Take out at least as much as you add: move the part you are
+changing into its own file. You do not have to split the whole file.
+
+A new file, or one that crossed the limit with this change, must come in
+under it. Do not delete code or squash it onto fewer lines to get there.
 
 How to split:
 - Find the seams. Look for groups of functions, components, or tests that
@@ -52,6 +77,10 @@ How to split:
   into a fixtures file in the same tests/ folder.
 - Scripts and seed data: move large data literals into their own files and
   import them.
+
+Commit the split on its own, before your change: stage only the moved code,
+commit, then commit your change on top. A move-only commit is one a reviewer
+can check for "no behaviour change".
 
 When you are done, run \`npm run check\` and commit again.`);
   process.exit(1);

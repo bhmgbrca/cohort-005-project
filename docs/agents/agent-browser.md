@@ -12,11 +12,42 @@ npm install -g agent-browser
 agent-browser install
 ```
 
+The factory workflows install it before the agent starts. Check with
+`which agent-browser` before installing it again.
+
 ## Asking your own question
 
 Start the app with `npm run dev` first. The examples below use
 `http://localhost:5173`, the dev server's default address — if `npm run dev`
 printed a different one, use that.
+
+### Signing in
+
+Most pages need a user. Sign in by posting to the DevUI's own endpoint from
+inside the page, so the session cookie lands in the browser:
+
+```bash
+(npm run dev > /tmp/dev.log 2>&1 &)
+agent-browser open http://localhost:5173/
+agent-browser eval "fetch('/api/switch-user',{method:'POST',body:new URLSearchParams({userId:'5'})}).then(r=>r.status)"
+```
+
+`npm run db:seed` makes the same rows every time, so these ids hold on a
+fresh database:
+
+| Who                    | `userId` | Use it for                               |
+| ---------------------- | -------- | ---------------------------------------- |
+| Emma Wilson, Student   | 5        | Enrolled in `introduction-to-typescript` |
+| Sarah Chen, Instructor | 2        | Teaches `introduction-to-typescript`     |
+| Alex Rivera, Admin     | 1        | The `/admin` pages                       |
+
+As Emma:
+
+- `/courses/introduction-to-typescript/lessons/1` is a full lesson.
+- `/courses/introduction-to-typescript/lessons/3` has a quiz.
+- `/courses/design-systems-with-tailwind` is a course she has not bought.
+
+### Reading the page
 
 A screenshot is pixels. To verify a fix you need a yes or a no, so read the
 DOM:
