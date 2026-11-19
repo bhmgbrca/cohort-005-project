@@ -6,7 +6,11 @@ import { Card, CardContent } from "~/components/ui/card";
 import { Textarea } from "~/components/ui/textarea";
 import { cn, formatRelativeTime } from "~/lib/utils";
 import { MAX_NOTE_LENGTH } from "~/lib/notes";
-import { describeNoteDraft, type NoteDraftStatus } from "~/modules/lesson-note";
+import {
+  describeNoteDraft,
+  type NoteDraft,
+  type NoteDraftStatus,
+} from "~/modules/lesson-note";
 
 export type LessonNoteData = { body: string; updatedAt: string } | null;
 
@@ -16,7 +20,7 @@ export function LessonNote({ note }: { note: LessonNoteData }) {
   const [draft, setDraft] = useState(note?.body ?? "");
   const isSaving = fetcher.state !== "idle";
   const error = isSaving ? undefined : fetcher.data?.error;
-  const { status, canSave, counter } = describeNoteDraft(
+  const noteDraft = describeNoteDraft(
     draft,
     note?.body ?? null,
     MAX_NOTE_LENGTH
@@ -41,10 +45,8 @@ export function LessonNote({ note }: { note: LessonNoteData }) {
 
           <NoteFooter
             isSaving={isSaving}
-            canSave={canSave}
             error={error}
-            status={status}
-            counter={counter}
+            draft={noteDraft}
             updatedAt={note?.updatedAt}
           />
         </fetcher.Form>
@@ -68,17 +70,13 @@ function NoteHeader() {
 
 function NoteFooter({
   isSaving,
-  canSave,
   error,
-  status,
-  counter,
+  draft: { status, canSave, counter },
   updatedAt,
 }: {
   isSaving: boolean;
-  canSave: boolean;
   error: string | undefined;
-  status: NoteDraftStatus;
-  counter: string;
+  draft: NoteDraft;
   updatedAt: string | undefined;
 }) {
   return (
