@@ -11,9 +11,8 @@ Or run the first three with `npm run check`.
 
 `npm run lint:oxlint` lints the whole repository with oxlint (`.oxlintrc.json`).
 
-Some files are already over the 5000-token limit. The pre-commit hook
-rejects a commit that grows one, so before you edit one, plan to move the part
-you change into its own file.
+Some files are already over the 5000-token limit, and the pre-commit hook
+rejects a commit that grows one.
 
 Modules are deep modules: see [app/modules/README.md](./app/modules/README.md) before adding or importing one.
 
