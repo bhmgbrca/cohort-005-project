@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "react", "jsx-a11y", "import", "vitest"],
-  "jsPlugins": ["./lint-rules/sql-raw.js"],
+  "jsPlugins": ["./lint-rules/sql-raw.js", "./lint-rules/clock.js"],
   "categories": {
     "correctness": "error"
   },
@@ -106,6 +106,14 @@
       "files": ["**/*.test.ts", "**/*.test.tsx"],
       "rules": {
         "max-lines-per-function": "off"
+      }
+    },
+    // Inject the clock: a module takes the time as an argument.
+    {
+      "files": ["app/modules/**"],
+      "excludeFiles": ["app/modules/**/tests/**", "app/modules/**/*.test.*"],
+      "rules": {
+        "clock/no-read": "error"
       }
     },
     {

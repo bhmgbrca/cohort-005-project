@@ -132,6 +132,13 @@ jobs:
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
+      - name: Install agent-browser
+        # Here, not in the agent's run: installing it from inside the agent
+        # cost each run a minute of polling and several turns of context.
+        run: |
+          npm install -g agent-browser@0.43.0
+          agent-browser install
+
       - name: Migrate and seed the database
         # The agent gets a real database, because half of this repo's checks
         # need one. It is disposable: a fresh one, migrated and seeded, on

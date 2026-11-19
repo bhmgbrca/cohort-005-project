@@ -32,8 +32,8 @@ Once a module owns a feature's data, the route asks the module for it and
 does not import `~/db` or `drizzle-orm` itself. The instructor analytics
 route gets everything from `instructorAnalytics`. A query in the loader
 splits the feature's rules across two files, and the module's tests stop
-covering what the page shows. `npm run lint:boundaries` enforces this for the
-instructor analytics route only; apply it to every other module by hand. See
+covering what the page shows. Check every route in the diff that has a
+module: any `~/db` or `drizzle-orm` import there is a breach. See
 [app/modules/README.md](./app/modules/README.md).
 
 ## Arrange tests through the module under test
@@ -42,9 +42,25 @@ Test setup calls the module's own functions. When the function you need does
 not exist, add it to the module rather than inserting rows directly, so a
 change to how the module stores its data leaves its tests alone.
 
+The exception is data the module only reads and no module creates yet
+(courses, lessons and quizzes, for a page-read module). Do not give the module
+write functions it has no other use for. Insert those rows through a shared
+builder in `app/test/`, next to `seedBaseData`, so every test that needs a
+course builds it the same way and one schema change is one edit.
+
 ## Keep files under 5000 tokens
 
-Keep every file under 5000 tokens.
+Keep every file under 5000 tokens. A file that was already over the limit
+may stay over it, but it must not grow. The pre-commit hook enforces both.
+
+## A module answers questions, it does not hand out rows
+
+A module's entry point returns what the caller needs to decide, not a raw
+database row for the caller to apply the rule to. `getComment(id)` handed
+the route a row so the route could check `row.lessonId === lessonId`; that
+check is the module's rule, so the module offers
+`findCommentInLesson(commentId, lessonId)` and returns `null` for a comment
+in another lesson.
 
 ## Wrap related writes in a transaction
 
