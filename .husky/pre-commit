@@ -1,0 +1,7 @@
+# Budget: under 3 seconds. Only fast checks, scoped to staged files where
+# possible. Typecheck and tests are too slow; run `npm run check` before
+# pushing.
+npm run -s check:tokens
+git diff --cached --name-only --diff-filter=ACMR -z \
+  | xargs -0 prettier --check --ignore-unknown --no-error-on-unmatched-pattern
+npm run -s lint:boundaries
