@@ -10,7 +10,7 @@ import { computeResult, getQuizById } from "./lib/quiz.server";
 export const lessonPage = {
   /** The page for a found course, or null when the lesson is missing. */
   load: loadLessonPage,
-  /** Marks the lesson completed for the Student, creating progress if needed. */
+  /** Marks the lesson completed at `now`, creating progress if needed. */
   markComplete: markLessonComplete,
   getComment: getCommentById,
   getQuiz: getQuizById,

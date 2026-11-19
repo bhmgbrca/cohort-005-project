@@ -66,7 +66,13 @@ describe("lessonPage.load", () => {
 
 describe("lessonPage.markComplete", () => {
   it("completes the lesson, and opening it again keeps it complete", async () => {
-    lessonPage.markComplete(seeded.user.id, seeded.lessonIds[0]);
+    const now = new Date("2026-01-02T03:04:05.000Z");
+    const progress = lessonPage.markComplete(
+      seeded.user.id,
+      seeded.lessonIds[0],
+      now
+    );
+    expect(progress.completedAt).toBe(now.toISOString());
     const page = await loadFull(seeded.lessonIds[0]);
     expect(page.lessonStatus).toBe("completed");
   });
